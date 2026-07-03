@@ -108,6 +108,27 @@ make upload EXAMPLE=LedBlink PORT=/dev/ttyUSB0   # compile + flash to a board
 make build-all                              # compile every example
 ```
 
+## Debugging
+
+Build with `-D CBHAL_DEBUG` to have the HAL trace what it does over `Serial`
+(the sketch must call `Serial.begin()`):
+
+```ini
+build_flags = -D CBHAL_DEBUG
+```
+
+It prints the `VCC_AUX_ENA`/`CONFIG_ENA` pin levels in `begin()`, every rail and
+LED change, and the deep-sleep entry. The `LedBlink` example also prints the
+boot/reset reason and the rail pin level each cycle without the flag.
+
+> **Boot caveat — GPIO12 (`CONFIG_ENA` / MTDI).** GPIO12 is the ESP32 flash-voltage
+> strapping pin and must be **low at reset**. The config-button network pulls it
+> up, which can select 1.8 V flash and cause intermittent boot failures
+> (`invalid header: 0xffffffff`, `RTCWDT_RTC_RESET`) — and, in turn, an LED that
+> only lights "sometimes". This is latched before firmware runs; fix it board-side
+> (burn the 3.3 V flash-voltage eFuse with `espefuse.py set_flash_voltage 3.3V`, or
+> remove/weaken the GPIO12 pull-up). Do not hold the config button across reset.
+
 ## Design & testing
 
 The library is split into a **pure core** (`board_pins.h`, `power_plan.*`) that

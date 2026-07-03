@@ -21,6 +21,14 @@
 #include <Arduino.h>
 #endif
 
+// Opt-in serial tracing. Build with -D CBHAL_DEBUG to have the driver print what
+// it does over Serial (which the application must have begun). No-op otherwise.
+#if defined(ARDUINO) && defined(CBHAL_DEBUG)
+#define CBHAL_LOG(...) Serial.printf("[cbhal] " __VA_ARGS__)
+#else
+#define CBHAL_LOG(...) ((void)0)
+#endif
+
 namespace cbhal {
 
 namespace {
@@ -92,16 +100,20 @@ void ComputeBoardHal::begin() {
 
     // Config button is an input; the board provides the pull-up.
     configureInput(kPinConfigEna);
+    CBHAL_LOG("begin: VCC_AUX_ENA(GPIO%d)=%d config(GPIO%d)=%d\n", kPinVccAuxEna,
+              readLevel(kPinVccAuxEna), kPinConfigEna, readLevel(kPinConfigEna));
 }
 
 void ComputeBoardHal::enableAuxRail() {
     driveOutput(kPinVccAuxEna, 1);
     railEnabled_ = true;
+    CBHAL_LOG("enableAuxRail: GPIO%d=%d\n", kPinVccAuxEna, readLevel(kPinVccAuxEna));
 }
 
 void ComputeBoardHal::disableAuxRail() {
     driveOutput(kPinVccAuxEna, 0);
     railEnabled_ = false;
+    CBHAL_LOG("disableAuxRail: GPIO%d=%d\n", kPinVccAuxEna, readLevel(kPinVccAuxEna));
 }
 
 void ComputeBoardHal::registerPin(int gpio) {
@@ -124,6 +136,8 @@ bool ComputeBoardHal::isConfigAsserted() const {
 }
 
 void ComputeBoardHal::writeLed(const LedColor& color) const {
+    CBHAL_LOG("led GPIO%d <- (%u,%u,%u) rail=%d\n", kPinLed, color.r, color.g, color.b,
+              railEnabled_);
 #if defined(ARDUINO)
     neopixelWrite(kPinLed, color.r, color.g, color.b);
 #else
@@ -158,6 +172,12 @@ void ComputeBoardHal::deepSleepMicros(std::uint64_t us, const RtcPowerConfig& cf
     const SleepPlan plan    = buildPlan();
     const PinOp* ops        = plan.ops();
     const std::size_t count = plan.opCount();
+
+    CBHAL_LOG("deepSleep: %llu us, %u pin ops, rail->LOW+hold\n", us,
+              static_cast<unsigned>(count));
+#if defined(ARDUINO) && defined(CBHAL_DEBUG)
+    Serial.flush();        // make sure the trace is out before the pads/UART die
+#endif
 
     // 1. Put peripheral I/O into Hi-Z (latched) and reset the always-on pins.
     for (std::size_t i = 0; i < count; ++i) {
