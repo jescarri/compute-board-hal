@@ -91,7 +91,14 @@ board.setRtcPowerConfig(cbhal::RtcPowerConfig::keepRtcMemory());
 board.setLedColor(cbhal::colors::Red);   // set colour + turn on
 board.ledOff();                          // off (remembers red)
 board.ledOn();                           // back to red
+board.setLedBrightness(80);              // 0-255; default 50
 ```
+
+LED **brightness defaults to 50/255 (~20%)** on purpose: the LED is on the 3.3 V
+`VCC_AUX` rail (below the WS2812's rated VDD), and full brightness draws enough
+current to droop that rail and corrupt the colour decode (the sibling lora-sensor
+runs the same LED at brightness 50 for the same reason). Raise it only if your
+supply holds up.
 
 Named colours (`cbhal::colors::Red/Green/Blue/White/Off`) or any `LedColor{r,g,b}`.
 The LED is driven with **FastLED** (a library dependency, auto-installed by

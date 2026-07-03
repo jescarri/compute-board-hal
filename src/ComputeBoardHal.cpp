@@ -152,10 +152,18 @@ void ComputeBoardHal::writeLed(const LedColor& color) const {
         FastLED.addLeds<WS2812B, kPinLed, GRB>(leds, 1);
         ledsInit = true;
     }
+    FastLED.setBrightness(ledBrightness_);        // keep LED current (and rail droop) low
     leds[0] = CRGB(color.r, color.g, color.b);
     FastLED.show();
 #else
     (void)color;        // WS2812 driving needs FastLED (Arduino); no-op under bare IDF
+#endif
+}
+
+void ComputeBoardHal::setLedBrightness(std::uint8_t brightness) {
+    ledBrightness_ = brightness;
+#if defined(ARDUINO)
+    FastLED.setBrightness(brightness);
 #endif
 }
 

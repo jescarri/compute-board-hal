@@ -29,6 +29,8 @@ setConfigActiveLow	KEYWORD2
 setLedColor	KEYWORD2
 ledOn	KEYWORD2
 ledOff	KEYWORD2
+setLedBrightness	KEYWORD2
+ledBrightness	KEYWORD2
 ledIsOn	KEYWORD2
 ledColor	KEYWORD2
 setRtcPowerConfig	KEYWORD2

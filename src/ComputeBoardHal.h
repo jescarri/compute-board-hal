@@ -59,6 +59,12 @@ class ComputeBoardHal {
     void ledOff();
     bool ledIsOn() const { return ledOn_; }
     LedColor ledColor() const { return ledColor_; }
+    // LED brightness (0-255). Defaults to a low value because the LED runs on the
+    // 3.3 V VCC_AUX rail (below the WS2812's rated VDD); full brightness draws
+    // enough current to droop that rail and corrupt the data decode. Raise it if
+    // your supply can hold up.
+    void setLedBrightness(std::uint8_t brightness);
+    std::uint8_t ledBrightness() const { return ledBrightness_; }
 
     // --- RTC power domains -------------------------------------------------
     // Persistent override for the RTC power-domain configuration used by deep
@@ -88,6 +94,7 @@ class ComputeBoardHal {
     std::size_t registeredCount_ = 0;
     RtcPowerConfig rtcCfg_       = RtcPowerConfig::maxSavings();
     LedColor ledColor_           = colors::White;
+    std::uint8_t ledBrightness_  = 50;        // ~20%; low for the 3.3 V rail
     bool railEnabled_            = false;
     bool ledOn_                  = false;
     bool configActiveLow_        = true;
