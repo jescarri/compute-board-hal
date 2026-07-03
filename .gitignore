@@ -1,0 +1,17 @@
+# PlatformIO
+.pio/
+.pioenvs/
+.piolibdeps/
+
+# Build / packaging output
+*.tar.gz
+build/
+out/
+
+# Editor / IDE
+.vscode/
+.ccls-cache/
+compile_commands.json
+
+# OS
+.DS_Store

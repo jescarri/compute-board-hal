@@ -1,0 +1,28 @@
+{
+  "name": "ComputeBoardHal",
+  "version": "0.1.0",
+  "description": "Mini hardware abstraction layer for the custom ESP32-WROOM-32E compute-board: secondary VCC_AUX rail control, config-button probe, and an ultra-low-power deep-sleep routine that latches all peripheral I/O into Hi-Z and holds the rail LOW through sleep.",
+  "keywords": "esp32, low-power, deep-sleep, hal, compute-board, gpio-hold, vcc-aux",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/jescarri/compute-board-hal.git"
+  },
+  "authors": [
+    {
+      "name": "Jesus Carrillo",
+      "email": "jesuscarrillo8@gmail.com",
+      "maintainer": true
+    }
+  ],
+  "license": "MIT",
+  "frameworks": ["arduino", "espidf"],
+  "platforms": ["espressif32"],
+  "headers": "ComputeBoardHal.h",
+  "export": {
+    "exclude": [
+      ".github",
+      ".pio",
+      "docs"
+    ]
+  }
+}
