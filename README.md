@@ -94,8 +94,8 @@ board.ledOn();                           // back to red
 ```
 
 Named colours (`cbhal::colors::Red/Green/Blue/White/Off`) or any `LedColor{r,g,b}`.
-The LED is driven with the Arduino core's `neopixelWrite()`; under a bare ESP-IDF
-build the LED calls are no-ops.
+The LED is driven with **FastLED** (a library dependency, auto-installed by
+PlatformIO); under a bare ESP-IDF build the LED calls are no-ops.
 
 ## Building the examples
 

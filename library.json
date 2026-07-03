@@ -18,6 +18,9 @@
   "frameworks": ["arduino", "espidf"],
   "platforms": ["espressif32"],
   "headers": "ComputeBoardHal.h",
+  "dependencies": {
+    "fastled/FastLED": "^3.9.0"
+  },
   "export": {
     "exclude": [
       ".github",

@@ -13,12 +13,14 @@
 #include "driver/gpio.h"
 #include "esp_sleep.h"
 
-// neopixelWrite() (RMT-backed single-WS2812 driver) ships with the Arduino-ESP32
-// core. The LED helpers use it when building under Arduino; under a bare ESP-IDF
-// build they compile to no-ops (documented limitation) so the rest of the HAL
-// still builds for IDF.
+// The LED helpers drive the on-board WS2812 with FastLED when building under
+// Arduino -- the same, robust RMT path proven on the sibling lora-sensor board.
+// (The Arduino core's neopixelWrite was tried first but its RMT path stalled
+// after a few writes on this hardware.) Under a bare ESP-IDF build the LED helpers
+// compile to no-ops so the rest of the HAL still builds for IDF.
 #if defined(ARDUINO)
 #include <Arduino.h>
+#include <FastLED.h>
 #endif
 
 // Opt-in serial tracing. Build with -D CBHAL_DEBUG to have the driver print what
@@ -139,9 +141,16 @@ void ComputeBoardHal::writeLed(const LedColor& color) const {
     CBHAL_LOG("led GPIO%d <- (%u,%u,%u) rail=%d\n", kPinLed, color.r, color.g, color.b,
               railEnabled_);
 #if defined(ARDUINO)
-    neopixelWrite(kPinLed, color.r, color.g, color.b);
+    static CRGB leds[1];
+    static bool ledsInit = false;
+    if (!ledsInit) {
+        FastLED.addLeds<WS2812B, kPinLed, GRB>(leds, 1);
+        ledsInit = true;
+    }
+    leds[0] = CRGB(color.r, color.g, color.b);
+    FastLED.show();
 #else
-    (void)color;        // requires the Arduino core's neopixelWrite; no-op under bare IDF
+    (void)color;        // WS2812 driving needs FastLED (Arduino); no-op under bare IDF
 #endif
 }
 
