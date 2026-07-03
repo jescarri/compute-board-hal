@@ -66,7 +66,7 @@ void loop() {}
 | `registerPin(gpio)` / `registerPins({...})` | Add application pins to force Hi-Z at sleep. |
 | `isConfigAsserted()` | Probe `CONFIG_ENA` (GPIO12). Returns `true`/`false` (active-low by default). |
 | `setConfigActiveLow(bool)` | Override config-button polarity. |
-| `setLedColor(color)` / `ledOn()` / `ledOff()` | Drive the on-board WS2812 LED (GPIO15). `ledOff()` remembers the last colour. |
+| `ledOn()` / `ledOff()` / `setLed(bool)` / `toggleLed()` | Drive the on-board LED (LED1 / GPIO15), a plain on/off LED. |
 | `setRtcPowerConfig(cfg)` / `rtcPowerConfig()` | Persistent RTC power-domain config (default: all OFF). |
 | `deepSleepSeconds(s[, cfg])` / `deepSleepMicros(us[, cfg])` | Enter deep sleep; does not return. |
 | `buildPlan()` | Inspect the deep-sleep pin plan without sleeping. |
@@ -87,30 +87,18 @@ board.setRtcPowerConfig(cbhal::RtcPowerConfig::keepRtcMemory());
 
 ### On-board LED
 
+`LED1` (GPIO15) is a plain on/off LED on the `VCC_AUX` rail (active-high). No
+external library is required.
+
 ```cpp
-board.setLedColor(cbhal::colors::Red);   // set colour + turn on
-board.ledOff();                          // off (remembers red)
-board.ledOn();                           // back to red
-board.setLedBrightness(80);              // 0-255; default 50
+board.ledOn();
+board.ledOff();
+board.setLed(true);      // == ledOn()
+board.toggleLed();
 ```
 
-LED **brightness defaults to 50/255 (~20%)** on purpose: the LED is on the 3.3 V
-`VCC_AUX` rail (below the WS2812's rated VDD), and full brightness draws enough
-current to droop that rail and corrupt the colour decode (the sibling lora-sensor
-runs the same LED at brightness 50 for the same reason). Raise it only if your
-supply holds up.
-
-Named colours (`cbhal::colors::Red/Green/Blue/White/Off`) or any `LedColor{r,g,b}`.
-The LED is driven with **FastLED** (a library dependency, auto-installed by
-PlatformIO); under a bare ESP-IDF build the LED calls are no-ops.
-
-> FastLED is pinned to **3.10.3** for reproducibility. WS2812 timing on this
-> board's 3.3 V `VCC_AUX` rail is on the low edge of spec; if colours look wrong,
-> that is the likely cause (see the boot/LED notes below).
-
-When mixing the LED with `Serial`, flush the UART before an LED write so the
-WS2812 RMT transfer and the console don't corrupt each other (see the `LedBlink`
-example).
+The `LedBlink` example blinks it and also demonstrates the config-button probe
+(prints `CONF_PRESSED`, waits 10 s, and reboots when the button is pressed).
 
 ## Building the examples
 

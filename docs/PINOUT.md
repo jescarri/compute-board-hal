@@ -16,7 +16,7 @@ values encoded in [`src/board_pins.h`](../src/board_pins.h).
 
 | Function | GPIO | Constant |
 |---|---|---|
-| WS2812 LED | 15 | `kPinLed` |
+| LED1 (on/off LED) | 15 | `kPinLed` |
 | I²C SDA | 21 | `kPinSda` |
 | I²C SCL | 22 | `kPinScl` |
 | SPI / SD CS | 5 | `kPinSdCs` |
@@ -76,11 +76,7 @@ If a pin appears in both the registered/Hi-Z set and the reset set, **Hi-Z wins*
 - **GPIO0 (`ESP_PROG`)** is the boot/download strapping pin and is reset at sleep.
 - Input-only pins (34–39) cannot be driven or held with output levels; they are
   reset rather than Hi-Z-held.
-- **The on-board LED (`XL-0807RGBC-WS2812B`) needs VDD ≥ 3.5 V.** Per its datasheet
-  the supply range is **3.5–5.5 V** ("100% functional above 4.5 V"), but it is wired
-  to the **3.3 V `VCC_AUX`** rail — **below its minimum**. At 3.3 V it lights but
-  decodes data unreliably (wrong/shifting colours); this is a supply-voltage issue,
-  not a firmware one. The data order is **GRB** (matches the HAL). Because this part's
-  data threshold is **`VIH = 0.55 × VDD`**, powering VDD from **5 V** still accepts the
-  ESP32's 3.3 V data with **no level shifter** (2.75 V threshold < 3.3 V). Feeding the
-  LED from 5 V (ideally a rail still gated for deep-sleep) is the reliable fix.
+- **LED1 (GPIO15) is driven as a plain on/off LED** (active-high), powered from the
+  `VCC_AUX` rail. The footprint can accept an addressable WS2812-class part, but that
+  chip's rated VDD is ≥ 3.5 V and this rail is 3.3 V, so it decodes data unreliably;
+  the HAL therefore treats LED1 as a simple digital LED (`ledOn()`/`ledOff()`).

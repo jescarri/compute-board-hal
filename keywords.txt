@@ -12,7 +12,6 @@ PowerDomainOption	KEYWORD1
 SleepPlan	KEYWORD1
 PinOp	KEYWORD1
 PinAction	KEYWORD1
-LedColor	KEYWORD1
 
 #######################################
 # Methods and Functions (KEYWORD2)
@@ -26,13 +25,11 @@ registerPin	KEYWORD2
 registerPins	KEYWORD2
 isConfigAsserted	KEYWORD2
 setConfigActiveLow	KEYWORD2
-setLedColor	KEYWORD2
 ledOn	KEYWORD2
 ledOff	KEYWORD2
-setLedBrightness	KEYWORD2
-ledBrightness	KEYWORD2
+setLed	KEYWORD2
+toggleLed	KEYWORD2
 ledIsOn	KEYWORD2
-ledColor	KEYWORD2
 setRtcPowerConfig	KEYWORD2
 rtcPowerConfig	KEYWORD2
 deepSleepMicros	KEYWORD2

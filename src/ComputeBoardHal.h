@@ -18,7 +18,6 @@
 #include <initializer_list>
 
 #include "board_pins.h"
-#include "led_color.h"
 #include "power_plan.h"
 
 namespace cbhal {
@@ -49,36 +48,28 @@ class ComputeBoardHal {
     bool isConfigAsserted() const;
     void setConfigActiveLow(bool activeLow) { configActiveLow_ = activeLow; }
 
-    // --- On-board addressable LED (WS2812 on GPIO15) -----------------------
-    // Set the LED colour and turn it on.
-    void setLedColor(const LedColor& color);
-    // Turn the LED on using the last colour set (defaults to white).
+    // --- On-board LED (LED1 on GPIO15) -------------------------------------
+    // A plain on/off LED (active-high), powered from the VCC_AUX rail. begin()
+    // configures the pin as an output and leaves the LED off.
     void ledOn();
-    // Turn the LED off (writes colour 0,0,0). The last colour is remembered so
-    // a subsequent ledOn() restores it.
     void ledOff();
+    void setLed(bool on);
+    void toggleLed();
     bool ledIsOn() const { return ledOn_; }
-    LedColor ledColor() const { return ledColor_; }
-    // LED brightness (0-255). Defaults to a low value because the LED runs on the
-    // 3.3 V VCC_AUX rail (below the WS2812's rated VDD); full brightness draws
-    // enough current to droop that rail and corrupt the data decode. Raise it if
-    // your supply can hold up.
-    void setLedBrightness(std::uint8_t brightness);
-    std::uint8_t ledBrightness() const { return ledBrightness_; }
 
     // --- RTC power domains -------------------------------------------------
     // Persistent override for the RTC power-domain configuration used by deep
     // sleep. Defaults to RtcPowerConfig::maxSavings() (all domains OFF).
-    void setRtcPowerConfig(const RtcPowerConfig& cfg) { rtcCfg_ = cfg; }
-    const RtcPowerConfig& rtcPowerConfig() const { return rtcCfg_; }
+    void setRtcPowerConfig(const RtcPowerConfig &cfg) { rtcCfg_ = cfg; }
+    const RtcPowerConfig &rtcPowerConfig() const { return rtcCfg_; }
 
     // --- Deep sleep --------------------------------------------------------
     // Force every registered/bus pin into latched Hi-Z, reset the always-on
     // pins, apply the RTC power config, drive VCC_AUX LOW and hold it, then
     // enter timer-wake deep sleep. Does not return.
-    [[noreturn]] void deepSleepMicros(std::uint64_t us, const RtcPowerConfig& cfg);
+    [[noreturn]] void deepSleepMicros(std::uint64_t us, const RtcPowerConfig &cfg);
     [[noreturn]] void deepSleepMicros(std::uint64_t us) { deepSleepMicros(us, rtcCfg_); }
-    [[noreturn]] void deepSleepSeconds(std::uint64_t s, const RtcPowerConfig& cfg) {
+    [[noreturn]] void deepSleepSeconds(std::uint64_t s, const RtcPowerConfig &cfg) {
         deepSleepMicros(s * 1000000ULL, cfg);
     }
     [[noreturn]] void deepSleepSeconds(std::uint64_t s) { deepSleepMicros(s * 1000000ULL, rtcCfg_); }
@@ -87,14 +78,11 @@ class ComputeBoardHal {
     SleepPlan buildPlan() const { return SleepPlan::build(registered_.data(), registeredCount_); }
 
   private:
-    void applyRtcPowerConfig(const RtcPowerConfig& cfg) const;
-    void writeLed(const LedColor& color) const;
+    void applyRtcPowerConfig(const RtcPowerConfig &cfg) const;
 
     std::array<int, kMaxPlanPins> registered_{};
     std::size_t registeredCount_ = 0;
     RtcPowerConfig rtcCfg_       = RtcPowerConfig::maxSavings();
-    LedColor ledColor_           = colors::White;
-    std::uint8_t ledBrightness_  = 50;        // ~20%; low for the 3.3 V rail
     bool railEnabled_            = false;
     bool ledOn_                  = false;
     bool configActiveLow_        = true;

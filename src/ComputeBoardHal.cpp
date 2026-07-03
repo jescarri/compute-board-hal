@@ -13,14 +13,10 @@
 #include "driver/gpio.h"
 #include "esp_sleep.h"
 
-// The LED helpers drive the on-board WS2812 with FastLED when building under
-// Arduino -- the same, robust RMT path proven on the sibling lora-sensor board.
-// (The Arduino core's neopixelWrite was tried first but its RMT path stalled
-// after a few writes on this hardware.) Under a bare ESP-IDF build the LED helpers
-// compile to no-ops so the rest of the HAL still builds for IDF.
+// LED1 (GPIO15) is a plain on/off LED, driven with the same gpio helpers as the
+// rest of the pins.
 #if defined(ARDUINO)
 #include <Arduino.h>
-#include <FastLED.h>
 #endif
 
 // Opt-in serial tracing. Build with -D CBHAL_DEBUG to have the driver print what
@@ -107,6 +103,11 @@ void ComputeBoardHal::begin() {
     // Config button as input with the internal pull-up (no external resistor
     // needed). The button pulls it to GND when pressed -> active-low.
     configureInputPullup(kPinConfigEna);
+
+    // On-board LED off to start.
+    driveOutput(kPinLed, 0);
+    ledOn_ = false;
+
     CBHAL_LOG("begin: VCC_AUX_ENA(GPIO%d)=%d config(GPIO%d)=%d\n", kPinVccAuxEna,
               readLevel(kPinVccAuxEna), kPinConfigEna, readLevel(kPinConfigEna));
 }
@@ -142,46 +143,21 @@ bool ComputeBoardHal::isConfigAsserted() const {
     return decodeConfigLevel(readLevel(kPinConfigEna), configActiveLow_);
 }
 
-void ComputeBoardHal::writeLed(const LedColor& color) const {
-    CBHAL_LOG("led GPIO%d <- (%u,%u,%u) rail=%d\n", kPinLed, color.r, color.g, color.b,
-              railEnabled_);
-#if defined(ARDUINO)
-    static CRGB leds[1];
-    static bool ledsInit = false;
-    if (!ledsInit) {
-        FastLED.addLeds<WS2812B, kPinLed, GRB>(leds, 1);
-        ledsInit = true;
-    }
-    FastLED.setBrightness(ledBrightness_);        // keep LED current (and rail droop) low
-    leds[0] = CRGB(color.r, color.g, color.b);
-    FastLED.show();
-#else
-    (void)color;        // WS2812 driving needs FastLED (Arduino); no-op under bare IDF
-#endif
-}
-
-void ComputeBoardHal::setLedBrightness(std::uint8_t brightness) {
-    ledBrightness_ = brightness;
-#if defined(ARDUINO)
-    FastLED.setBrightness(brightness);
-#endif
-}
-
-void ComputeBoardHal::setLedColor(const LedColor& color) {
-    ledColor_ = color;
-    ledOn_    = true;
-    writeLed(color);
-}
-
 void ComputeBoardHal::ledOn() {
+    driveOutput(kPinLed, 1);
     ledOn_ = true;
-    writeLed(ledColor_);
+    CBHAL_LOG("led GPIO%d ON\n", kPinLed);
 }
 
 void ComputeBoardHal::ledOff() {
+    driveOutput(kPinLed, 0);
     ledOn_ = false;
-    writeLed(colors::Off);
+    CBHAL_LOG("led GPIO%d OFF\n", kPinLed);
 }
+
+void ComputeBoardHal::setLed(bool on) { on ? ledOn() : ledOff(); }
+
+void ComputeBoardHal::toggleLed() { setLed(!ledOn_); }
 
 void ComputeBoardHal::applyRtcPowerConfig(const RtcPowerConfig& cfg) const {
     esp_sleep_pd_config(ESP_PD_DOMAIN_RTC_PERIPH, toIdfOption(cfg.rtc_periph));

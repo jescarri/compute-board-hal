@@ -1,12 +1,9 @@
-// LedBlink -- blink the on-board WS2812 red once per second, with serial debug.
+// LedBlink -- blink the on-board LED (LED1 / GPIO15) and test the config button.
 //
-// begin() brings up VCC_AUX (the LED is on the secondary rail); we set the colour
-// once, then toggle the LED on/off with a 500 ms half-period so it blinks once a
-// second. Serial (115200) reports the boot/reset reason and rail state.
-//
-// Serial discipline: the UART is flushed *before* every LED write, and no serial
-// is printed while the WS2812 RMT transfer is in flight, so the LED driver and
-// the console never corrupt each other. Lines end in CRLF for dumb terminals.
+// The LED is a plain on/off LED on the VCC_AUX rail; begin() brings the rail up.
+// The loop blinks it once per second. Each iteration also checks CONFIG_ENA
+// (GPIO12): when the button is pressed (pulled to GND) it prints "CONF_PRESSED",
+// waits 10 s, then reboots.
 
 #include <ComputeBoardHal.h>
 
@@ -39,34 +36,34 @@ static const char* resetReasonStr(esp_reset_reason_t r) {
     }
 }
 
+// Drive the LED for `ms`, polling the config button throughout. Returns true if
+// the button was seen pressed during the interval.
+static bool blinkAndPoll(bool on, uint32_t ms) {
+    board.setLed(on);
+    const uint32_t start = millis();
+    while (millis() - start < ms) {
+        if (board.isConfigAsserted()) return true;
+        delay(10);
+    }
+    return false;
+}
+
 void setup() {
     Serial.begin(115200);
     delay(200);
     Serial.printf("\r\n[LedBlink] boot -- reset reason: %s\r\n", resetReasonStr(esp_reset_reason()));
 
     board.begin();
-    delay(100);        // let VCC_AUX settle before the first LED write
-
-    Serial.printf("[LedBlink] auxRailEnabled=%d  GPIO%d(level)=%d  configAsserted=%d\r\n",
-                  board.auxRailEnabled(), cbhal::kPinVccAuxEna,
-                  digitalRead(cbhal::kPinVccAuxEna), board.isConfigAsserted());
-    Serial.flush();        // drain the UART before the first LED write
-
-    board.setLedColor(cbhal::colors::Red);
-    Serial.println("[LedBlink] LED set to red\r");
+    Serial.printf("[LedBlink] auxRailEnabled=%d  configAsserted=%d\r\n", board.auxRailEnabled(),
+                  board.isConfigAsserted());
 }
 
 void loop() {
-    static uint32_t n = 0;
-
-    Serial.printf("[LedBlink] #%lu ON\r\n", static_cast<unsigned long>(n));
-    Serial.flush();        // UART fully out before FastLED.show() runs
-    board.ledOn();
-    delay(500);        // WS2812 transfer completes here; no serial in flight
-
-    Serial.printf("[LedBlink] #%lu OFF\r\n", static_cast<unsigned long>(n));
-    Serial.flush();
-    board.ledOff();
-    delay(500);
-    ++n;
+    // One blink cycle (on 500 ms, off 500 ms), polling the config button throughout.
+    if (blinkAndPoll(true, 500) || blinkAndPoll(false, 500)) {
+        Serial.println("CONF_PRESSED\r");
+        Serial.flush();
+        delay(10000);         // wait 10 s
+        ESP.restart();        // reboot
+    }
 }
