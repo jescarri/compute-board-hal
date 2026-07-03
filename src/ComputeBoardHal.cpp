@@ -70,12 +70,15 @@ void driveOutput(int gpio, int level) {
 #endif
 }
 
-// Configure a pin as a plain input.
-void configureInput(int gpio) {
+// Configure a pin as an input with the internal pull-up enabled. Used for the
+// config button so no external pull-up resistor is needed (the board pull-up can
+// be removed to keep GPIO12/MTDI low at reset for a correct 3.3 V flash strap).
+void configureInputPullup(int gpio) {
 #if defined(ARDUINO)
-    pinMode(gpio, INPUT);
+    pinMode(gpio, INPUT_PULLUP);
 #else
     gpio_set_direction(asGpio(gpio), GPIO_MODE_INPUT);
+    gpio_set_pull_mode(asGpio(gpio), GPIO_PULLUP_ONLY);
 #endif
 }
 
@@ -91,17 +94,19 @@ int readLevel(int gpio) {
 }        // namespace
 
 void ComputeBoardHal::begin() {
-    // Release holds latched by a previous deep sleep so the rail can move again.
+    // Release holds latched by a previous deep sleep so the pads can move again.
     gpio_deep_sleep_hold_dis();
     gpio_hold_dis(asGpio(kPinVccAuxEna));
+    gpio_hold_dis(asGpio(kPinConfigEna));
 
     // Bring up the secondary rail (active-high; the board also pulls it up).
     driveOutput(kPinVccAuxEna, 1);
     gpio_hold_dis(asGpio(kPinVccAuxEna));        // ensure the pad is free to move
     railEnabled_ = true;
 
-    // Config button is an input; the board provides the pull-up.
-    configureInput(kPinConfigEna);
+    // Config button as input with the internal pull-up (no external resistor
+    // needed). The button pulls it to GND when pressed -> active-low.
+    configureInputPullup(kPinConfigEna);
     CBHAL_LOG("begin: VCC_AUX_ENA(GPIO%d)=%d config(GPIO%d)=%d\n", kPinVccAuxEna,
               readLevel(kPinVccAuxEna), kPinConfigEna, readLevel(kPinConfigEna));
 }
@@ -202,16 +207,24 @@ void ComputeBoardHal::deepSleepMicros(std::uint64_t us, const RtcPowerConfig& cf
         }
     }
 
-    // 2. Apply the RTC power-domain configuration (default: all domains OFF).
+    // 2. CONFIG_ENA (GPIO12) is the MTDI flash-voltage strapping pin. Force it LOW
+    //    and latch it so the next deep-sleep wake re-samples the strap as low
+    //    (3.3 V flash) and the debounce cap can't hold a high charge into reset.
+    //    (Deliberately NOT left floating/Hi-Z: on a strapping pin that risks a
+    //    1.8 V-flash mis-strap -- and a boot loop -- on wake.)
+    driveOutput(kPinConfigEna, 0);
+    gpio_hold_en(asGpio(kPinConfigEna));
+
+    // 3. Apply the RTC power-domain configuration (default: all domains OFF).
     applyRtcPowerConfig(cfg);
 
-    // 3. Collapse the secondary rail and latch it LOW for the whole sleep.
+    // 4. Collapse the secondary rail and latch it LOW for the whole sleep.
     driveOutput(kPinVccAuxEna, 0);
     railEnabled_ = false;
     gpio_hold_en(asGpio(kPinVccAuxEna));
     gpio_deep_sleep_hold_en();
 
-    // 4. Arm the timer wake-up and sleep. Does not return.
+    // 5. Arm the timer wake-up and sleep. Does not return.
     esp_sleep_enable_timer_wakeup(us);
     esp_deep_sleep_start();
 }

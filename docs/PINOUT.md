@@ -49,6 +49,7 @@ input-only for safety in `isInputOnly()`.
 | VCC_AUX bus pins | `kDefaultAuxHiZPins` = {21, 22, 5, 18, 19, 23} | `INPUT` + float + disable pulls + `gpio_hold_en` |
 | Application pins | (registered at runtime) | same Hi-Z + hold |
 | Strapping / always-on | `kAlwaysOnResetPins` = {0, 2, 15, 34, 35, 36, 37, 38, 39} | `gpio_reset_pin` |
+| Config (strapping) | `kPinConfigEna` = 12 | driven **LOW** + `gpio_hold_en` (MTDI strap must be low at wake) |
 | Rail enable | `kPinVccAuxEna` = 13 | driven **LOW**, `gpio_hold_en`, `gpio_deep_sleep_hold_en` |
 
 If a pin appears in both the registered/Hi-Z set and the reset set, **Hi-Z wins**
@@ -57,10 +58,22 @@ If a pin appears in both the registered/Hi-Z set and the reset set, **Hi-Z wins*
 ## Caveats
 
 - **GPIO12 is a strapping pin (MTDI).** It selects the flash voltage at boot and
-  must read LOW during reset for a 3.3 V flash part. The board's config-button
-  network keeps it high through a pull-up, so **do not hold the config button
-  across a hard reset/power-up** unless your module's flash voltage tolerates it.
-  The HAL only *reads* this pin; boot-strap behaviour is a board-level concern.
+  must read **LOW at reset** for a 3.3 V flash part. GPIO12 has an ESP32 **internal
+  pull-down that is active at reset**, so the recommended board configuration is to
+  **remove the external pull-up** on `CONFIG_ENA` and let the HAL provide the
+  pull-up at runtime instead:
+  - `begin()` enables the **internal pull-up** (`INPUT_PULLUP`) — no external
+    resistor needed; the button still reads high idle / low pressed.
+  - At reset (power-on and deep-sleep wake) the pin is low via the internal
+    pull-down, so the flash strap is correct.
+  - Deep sleep drives GPIO12 **LOW and latches it** (not Hi-Z): the wake reset
+    re-samples the strap, and a floating pin with the debounce cap could otherwise
+    hold a high charge into reset and mis-select 1.8 V flash.
+
+  If you keep the external pull-up instead, it fights the strap: expect
+  intermittent `invalid header: 0xffffffff` / `RTCWDT_RTC_RESET` boots, and burn
+  the 3.3 V flash-voltage eFuse (`espefuse.py set_flash_voltage 3.3V`) or don't
+  hold the config button across reset. A small cap from GPIO12 to GND is fine.
 - **GPIO0 (`ESP_PROG`)** is the boot/download strapping pin and is reset at sleep.
 - Input-only pins (34–39) cannot be driven or held with output levels; they are
   reset rather than Hi-Z-held.

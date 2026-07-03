@@ -122,12 +122,15 @@ LED change, and the deep-sleep entry. The `LedBlink` example also prints the
 boot/reset reason and the rail pin level each cycle without the flag.
 
 > **Boot caveat — GPIO12 (`CONFIG_ENA` / MTDI).** GPIO12 is the ESP32 flash-voltage
-> strapping pin and must be **low at reset**. The config-button network pulls it
-> up, which can select 1.8 V flash and cause intermittent boot failures
-> (`invalid header: 0xffffffff`, `RTCWDT_RTC_RESET`) — and, in turn, an LED that
-> only lights "sometimes". This is latched before firmware runs; fix it board-side
-> (burn the 3.3 V flash-voltage eFuse with `espefuse.py set_flash_voltage 3.3V`, or
-> remove/weaken the GPIO12 pull-up). Do not hold the config button across reset.
+> strapping pin and must be **low at reset**. An external pull-up on the config
+> button forces it high → selects 1.8 V flash → intermittent boot failures
+> (`invalid header: 0xffffffff`, `RTCWDT_RTC_RESET`) and a "sometimes" LED.
+> **Recommended: remove the external pull-up.** GPIO12 has an internal pull-down at
+> reset (correct 3.3 V strap), and the HAL supplies the pull-up at runtime
+> (`INPUT_PULLUP`) for the button; deep sleep drives GPIO12 low + holds it so the
+> wake reset also straps correctly. A cap from GPIO12 to GND is fine. If you keep
+> the external pull-up, burn the eFuse instead (`espefuse.py set_flash_voltage
+> 3.3V`) and don't hold the button across reset.
 
 ## Design & testing
 
