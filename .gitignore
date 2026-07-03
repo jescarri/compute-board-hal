@@ -12,6 +12,6 @@ out/
 .vscode/
 .ccls-cache/
 compile_commands.json
-
+.cache/
 # OS
 .DS_Store
