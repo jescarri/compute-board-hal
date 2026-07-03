@@ -71,8 +71,7 @@ If a pin appears in both the registered/Hi-Z set and the reset set, **Hi-Z wins*
     hold a high charge into reset and mis-select 1.8 V flash.
 
   If you keep the external pull-up instead, it fights the strap: expect
-  intermittent `invalid header: 0xffffffff` / `RTCWDT_RTC_RESET` boots, and burn
-  the 3.3 V flash-voltage eFuse (`espefuse.py set_flash_voltage 3.3V`) or don't
+  intermittent `invalid header: 0xffffffff` / `RTCWDT_RTC_RESET` boots, so don't
   hold the config button across reset. A small cap from GPIO12 to GND is fine.
 - **GPIO0 (`ESP_PROG`)** is the boot/download strapping pin and is reset at sleep.
 - Input-only pins (34–39) cannot be driven or held with output levels; they are

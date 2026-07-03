@@ -128,9 +128,7 @@ boot/reset reason and the rail pin level each cycle without the flag.
 > **Recommended: remove the external pull-up.** GPIO12 has an internal pull-down at
 > reset (correct 3.3 V strap), and the HAL supplies the pull-up at runtime
 > (`INPUT_PULLUP`) for the button; deep sleep drives GPIO12 low + holds it so the
-> wake reset also straps correctly. A cap from GPIO12 to GND is fine. If you keep
-> the external pull-up, burn the eFuse instead (`espefuse.py set_flash_voltage
-> 3.3V`) and don't hold the button across reset.
+> wake reset also straps correctly. A cap from GPIO12 to GND is fine.
 
 ## Design & testing
 
