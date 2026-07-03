@@ -40,11 +40,42 @@ esp_sleep_pd_option_t toIdfOption(PowerDomainOption option) {
 }
 
 // Drive an output pin to a level after clearing any latched hold on it.
+//
+// Under Arduino we use pinMode/digitalWrite. This is the path proven on this
+// board (and its sibling lora-sensor) for GPIO13/VCC_AUX_ENA, which is an
+// RTC-capable pad: bare gpio_set_direction/gpio_set_level does not reliably take
+// such a pad high, whereas Arduino's pinMode does the extra pad-mux/reset work.
+// Bare ESP-IDF builds fall back to the gpio driver (with gpio_reset_pin to
+// detach any prior routing).
 void driveOutput(int gpio, int level) {
     const gpio_num_t pin = asGpio(gpio);
     gpio_hold_dis(pin);
+#if defined(ARDUINO)
+    pinMode(gpio, OUTPUT);
+    digitalWrite(gpio, level ? HIGH : LOW);
+#else
+    gpio_reset_pin(pin);
     gpio_set_direction(pin, GPIO_MODE_OUTPUT);
     gpio_set_level(pin, level);
+#endif
+}
+
+// Configure a pin as a plain input.
+void configureInput(int gpio) {
+#if defined(ARDUINO)
+    pinMode(gpio, INPUT);
+#else
+    gpio_set_direction(asGpio(gpio), GPIO_MODE_INPUT);
+#endif
+}
+
+// Read a pin's current logic level (0/1).
+int readLevel(int gpio) {
+#if defined(ARDUINO)
+    return digitalRead(gpio);
+#else
+    return gpio_get_level(asGpio(gpio));
+#endif
 }
 
 }        // namespace
@@ -56,10 +87,11 @@ void ComputeBoardHal::begin() {
 
     // Bring up the secondary rail (active-high; the board also pulls it up).
     driveOutput(kPinVccAuxEna, 1);
+    gpio_hold_dis(asGpio(kPinVccAuxEna));        // ensure the pad is free to move
     railEnabled_ = true;
 
     // Config button is an input; the board provides the pull-up.
-    gpio_set_direction(asGpio(kPinConfigEna), GPIO_MODE_INPUT);
+    configureInput(kPinConfigEna);
 }
 
 void ComputeBoardHal::enableAuxRail() {
@@ -88,7 +120,7 @@ void ComputeBoardHal::registerPins(std::initializer_list<int> gpios) {
 }
 
 bool ComputeBoardHal::isConfigAsserted() const {
-    return decodeConfigLevel(gpio_get_level(asGpio(kPinConfigEna)), configActiveLow_);
+    return decodeConfigLevel(readLevel(kPinConfigEna), configActiveLow_);
 }
 
 void ComputeBoardHal::writeLed(const LedColor& color) const {

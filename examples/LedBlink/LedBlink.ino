@@ -10,6 +10,7 @@ static cbhal::ComputeBoardHal board;
 
 void setup() {
     board.begin();
+    delay(100);
     board.setLedColor(cbhal::colors::Red);        // red, and turns the LED on
 }
 
