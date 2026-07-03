@@ -13,6 +13,14 @@
 #include "driver/gpio.h"
 #include "esp_sleep.h"
 
+// neopixelWrite() (RMT-backed single-WS2812 driver) ships with the Arduino-ESP32
+// core. The LED helpers use it when building under Arduino; under a bare ESP-IDF
+// build they compile to no-ops (documented limitation) so the rest of the HAL
+// still builds for IDF.
+#if defined(ARDUINO)
+#include <Arduino.h>
+#endif
+
 namespace cbhal {
 
 namespace {
@@ -81,6 +89,30 @@ void ComputeBoardHal::registerPins(std::initializer_list<int> gpios) {
 
 bool ComputeBoardHal::isConfigAsserted() const {
     return decodeConfigLevel(gpio_get_level(asGpio(kPinConfigEna)), configActiveLow_);
+}
+
+void ComputeBoardHal::writeLed(const LedColor& color) const {
+#if defined(ARDUINO)
+    neopixelWrite(kPinLed, color.r, color.g, color.b);
+#else
+    (void)color;        // requires the Arduino core's neopixelWrite; no-op under bare IDF
+#endif
+}
+
+void ComputeBoardHal::setLedColor(const LedColor& color) {
+    ledColor_ = color;
+    ledOn_    = true;
+    writeLed(color);
+}
+
+void ComputeBoardHal::ledOn() {
+    ledOn_ = true;
+    writeLed(ledColor_);
+}
+
+void ComputeBoardHal::ledOff() {
+    ledOn_ = false;
+    writeLed(colors::Off);
 }
 
 void ComputeBoardHal::applyRtcPowerConfig(const RtcPowerConfig& cfg) const {

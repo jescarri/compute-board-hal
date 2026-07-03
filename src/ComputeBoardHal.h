@@ -18,6 +18,7 @@
 #include <initializer_list>
 
 #include "board_pins.h"
+#include "led_color.h"
 #include "power_plan.h"
 
 namespace cbhal {
@@ -48,6 +49,17 @@ class ComputeBoardHal {
     bool isConfigAsserted() const;
     void setConfigActiveLow(bool activeLow) { configActiveLow_ = activeLow; }
 
+    // --- On-board addressable LED (WS2812 on GPIO15) -----------------------
+    // Set the LED colour and turn it on.
+    void setLedColor(const LedColor& color);
+    // Turn the LED on using the last colour set (defaults to white).
+    void ledOn();
+    // Turn the LED off (writes colour 0,0,0). The last colour is remembered so
+    // a subsequent ledOn() restores it.
+    void ledOff();
+    bool ledIsOn() const { return ledOn_; }
+    LedColor ledColor() const { return ledColor_; }
+
     // --- RTC power domains -------------------------------------------------
     // Persistent override for the RTC power-domain configuration used by deep
     // sleep. Defaults to RtcPowerConfig::maxSavings() (all domains OFF).
@@ -70,11 +82,14 @@ class ComputeBoardHal {
 
   private:
     void applyRtcPowerConfig(const RtcPowerConfig& cfg) const;
+    void writeLed(const LedColor& color) const;
 
     std::array<int, kMaxPlanPins> registered_{};
     std::size_t registeredCount_ = 0;
     RtcPowerConfig rtcCfg_       = RtcPowerConfig::maxSavings();
+    LedColor ledColor_           = colors::White;
     bool railEnabled_            = false;
+    bool ledOn_                  = false;
     bool configActiveLow_        = true;
 };
 

@@ -66,6 +66,7 @@ void loop() {}
 | `registerPin(gpio)` / `registerPins({...})` | Add application pins to force Hi-Z at sleep. |
 | `isConfigAsserted()` | Probe `CONFIG_ENA` (GPIO12). Returns `true`/`false` (active-low by default). |
 | `setConfigActiveLow(bool)` | Override config-button polarity. |
+| `setLedColor(color)` / `ledOn()` / `ledOff()` | Drive the on-board WS2812 LED (GPIO15). `ledOff()` remembers the last colour. |
 | `setRtcPowerConfig(cfg)` / `rtcPowerConfig()` | Persistent RTC power-domain config (default: all OFF). |
 | `deepSleepSeconds(s[, cfg])` / `deepSleepMicros(us[, cfg])` | Enter deep sleep; does not return. |
 | `buildPlan()` | Inspect the deep-sleep pin plan without sleeping. |
@@ -83,6 +84,29 @@ board.setRtcPowerConfig(cbhal::RtcPowerConfig::keepRtcMemory());
 
 `RtcPowerConfig` is a plain aggregate; you can also set each domain
 (`rtc_periph`, `rtc_slow_mem`, `rtc_fast_mem`, `xtal`) to `Off` / `On` / `Auto`.
+
+### On-board LED
+
+```cpp
+board.setLedColor(cbhal::colors::Red);   // set colour + turn on
+board.ledOff();                          // off (remembers red)
+board.ledOn();                           // back to red
+```
+
+Named colours (`cbhal::colors::Red/Green/Blue/White/Off`) or any `LedColor{r,g,b}`.
+The LED is driven with the Arduino core's `neopixelWrite()`; under a bare ESP-IDF
+build the LED calls are no-ops.
+
+## Building the examples
+
+A `Makefile` wraps the common tasks:
+
+```bash
+make test                                   # host unit tests
+make build  EXAMPLE=LedBlink                # compile an example for the board
+make upload EXAMPLE=LedBlink PORT=/dev/ttyUSB0   # compile + flash to a board
+make build-all                              # compile every example
+```
 
 ## Design & testing
 
