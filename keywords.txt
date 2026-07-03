@@ -1,0 +1,43 @@
+#######################################
+# Syntax Coloring Map For ComputeBoardHal
+#######################################
+
+#######################################
+# Datatypes (KEYWORD1)
+#######################################
+
+ComputeBoardHal	KEYWORD1
+RtcPowerConfig	KEYWORD1
+PowerDomainOption	KEYWORD1
+SleepPlan	KEYWORD1
+PinOp	KEYWORD1
+PinAction	KEYWORD1
+
+#######################################
+# Methods and Functions (KEYWORD2)
+#######################################
+
+begin	KEYWORD2
+enableAuxRail	KEYWORD2
+disableAuxRail	KEYWORD2
+auxRailEnabled	KEYWORD2
+registerPin	KEYWORD2
+registerPins	KEYWORD2
+isConfigAsserted	KEYWORD2
+setConfigActiveLow	KEYWORD2
+setRtcPowerConfig	KEYWORD2
+rtcPowerConfig	KEYWORD2
+deepSleepMicros	KEYWORD2
+deepSleepSeconds	KEYWORD2
+buildPlan	KEYWORD2
+decodeConfigLevel	KEYWORD2
+maxSavings	KEYWORD2
+keepRtcMemory	KEYWORD2
+
+#######################################
+# Constants (LITERAL1)
+#######################################
+
+kPinVccAuxEna	LITERAL1
+kPinConfigEna	LITERAL1
+kPinLed	LITERAL1

@@ -1,0 +1,66 @@
+# Compute-Board Pinout
+
+Authoritative ESP32-WROOM-32E pin assignments for the `compute-board` baseboard.
+Every entry below was traced from the net-to-pin connectivity in
+`compute-board.kicad_sch` (module reference `U1`), not inferred. These are the
+values encoded in [`src/board_pins.h`](../src/board_pins.h).
+
+## Control signals
+
+| Signal | GPIO | Direction | Idle state | Notes |
+|---|---|---|---|---|
+| `VCC_AUX_ENA` | **13** | Output | HIGH (rail ON) | Drives the `XC6220` LDO (U2) enable. Active-high with a board pull-up, so the secondary rail powers up by default. Deep sleep drives it **LOW and holds it**. |
+| `CONFIG_ENA` | **12** | Input | HIGH | Config button `SW2` to GND with pull-up (`R8`) + RC debounce (`C7`) → **active-low**. Also the MTDI strapping pin — see caveat below. |
+
+## On-board peripherals
+
+| Function | GPIO | Constant |
+|---|---|---|
+| WS2812 LED | 15 | `kPinLed` |
+| I²C SDA | 21 | `kPinSda` |
+| I²C SCL | 22 | `kPinScl` |
+| SPI / SD CS | 5 | `kPinSdCs` |
+| SPI / SD SCK | 18 | `kPinSdSck` |
+| SPI / SD MISO | 19 | `kPinSdMiso` |
+| SPI / SD MOSI | 23 | `kPinSdMosi` |
+| UART0 RX | 3 | `kPinUart0Rx` |
+| UART0 TX | 1 | `kPinUart0Tx` |
+
+The SPI/SD and I²C pins live on the `VCC_AUX` rail and are placed in latched Hi-Z
+automatically at deep sleep (`kDefaultAuxHiZPins`).
+
+## Broken-out header (J1) GPIOs
+
+Available on the add-on header for application peripherals. Register the ones you
+drive with `board.registerPins({...})` so they are forced into Hi-Z at sleep.
+
+| GPIO | Capability |
+|---|---|
+| 2, 4, 16, 17, 25, 26, 27, 32, 33 | full I/O |
+| 34, 35, 36, 39 | **input-only** (no output drivers, no internal pulls) |
+
+`GPIO37`/`GPIO38` are not exposed on the WROOM module but are treated as
+input-only for safety in `isInputOnly()`.
+
+## Deep-sleep pin roles
+
+| Set | Constant | Action at sleep |
+|---|---|---|
+| VCC_AUX bus pins | `kDefaultAuxHiZPins` = {21, 22, 5, 18, 19, 23} | `INPUT` + float + disable pulls + `gpio_hold_en` |
+| Application pins | (registered at runtime) | same Hi-Z + hold |
+| Strapping / always-on | `kAlwaysOnResetPins` = {0, 2, 15, 34, 35, 36, 37, 38, 39} | `gpio_reset_pin` |
+| Rail enable | `kPinVccAuxEna` = 13 | driven **LOW**, `gpio_hold_en`, `gpio_deep_sleep_hold_en` |
+
+If a pin appears in both the registered/Hi-Z set and the reset set, **Hi-Z wins**
+(the pin is latched, not reset).
+
+## Caveats
+
+- **GPIO12 is a strapping pin (MTDI).** It selects the flash voltage at boot and
+  must read LOW during reset for a 3.3 V flash part. The board's config-button
+  network keeps it high through a pull-up, so **do not hold the config button
+  across a hard reset/power-up** unless your module's flash voltage tolerates it.
+  The HAL only *reads* this pin; boot-strap behaviour is a board-level concern.
+- **GPIO0 (`ESP_PROG`)** is the boot/download strapping pin and is reset at sleep.
+- Input-only pins (34–39) cannot be driven or held with output levels; they are
+  reset rather than Hi-Z-held.
