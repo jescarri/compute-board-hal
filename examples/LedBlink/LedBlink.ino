@@ -1,13 +1,12 @@
 // LedBlink -- blink the on-board WS2812 red once per second, with serial debug.
 //
-// begin() brings up VCC_AUX (the LED is on the secondary rail); we set the
-// colour once, then toggle the LED on/off with a 500 ms half-period so it blinks
-// once every second. Serial output at 115200 reports the boot/reset reason, the
-// rail-enable pin state, and each LED toggle so you can see what the board does.
+// begin() brings up VCC_AUX (the LED is on the secondary rail); we set the colour
+// once, then toggle the LED on/off with a 500 ms half-period so it blinks once a
+// second. Serial (115200) reports the boot/reset reason and rail state.
 //
-// If the reset reason shows RTCWDT_RTC_RESET / BROWNOUT, or the console restarts
-// mid-run, the board is rebooting -- most likely the GPIO12 (CONFIG_ENA / MTDI)
-// flash-voltage strapping issue, which also makes the LED blink only "sometimes".
+// Serial discipline: the UART is flushed *before* every LED write, and no serial
+// is printed while the WS2812 RMT transfer is in flight, so the LED driver and
+// the console never corrupt each other. Lines end in CRLF for dumb terminals.
 
 #include <ComputeBoardHal.h>
 
@@ -43,31 +42,31 @@ static const char* resetReasonStr(esp_reset_reason_t r) {
 void setup() {
     Serial.begin(115200);
     delay(200);
-    Serial.println();
-    Serial.printf("[LedBlink] boot -- reset reason: %s\n", resetReasonStr(esp_reset_reason()));
+    Serial.printf("\r\n[LedBlink] boot -- reset reason: %s\r\n", resetReasonStr(esp_reset_reason()));
 
     board.begin();
     delay(100);        // let VCC_AUX settle before the first LED write
 
-    // GPIO13 is an output now; digitalRead reports the driven level. It should
-    // read 1 (rail enabled). If it reads 0, the rail is not powered.
-    Serial.printf("[LedBlink] auxRailEnabled=%d  GPIO%d(level)=%d  configAsserted=%d\n",
+    Serial.printf("[LedBlink] auxRailEnabled=%d  GPIO%d(level)=%d  configAsserted=%d\r\n",
                   board.auxRailEnabled(), cbhal::kPinVccAuxEna,
                   digitalRead(cbhal::kPinVccAuxEna), board.isConfigAsserted());
+    Serial.flush();        // drain the UART before the first LED write
 
     board.setLedColor(cbhal::colors::Red);
-    Serial.println("[LedBlink] LED set to red");
+    Serial.println("[LedBlink] LED set to red\r");
 }
 
 void loop() {
     static uint32_t n = 0;
+
+    Serial.printf("[LedBlink] #%lu ON\r\n", static_cast<unsigned long>(n));
+    Serial.flush();        // UART fully out before FastLED.show() runs
     board.ledOn();
-    Serial.printf("[LedBlink] #%lu ON   rail=%d GPIO%d=%d\n", static_cast<unsigned long>(n),
-                  board.auxRailEnabled(), cbhal::kPinVccAuxEna,
-                  digitalRead(cbhal::kPinVccAuxEna));
-    delay(500);
+    delay(500);        // WS2812 transfer completes here; no serial in flight
+
+    Serial.printf("[LedBlink] #%lu OFF\r\n", static_cast<unsigned long>(n));
+    Serial.flush();
     board.ledOff();
-    Serial.printf("[LedBlink] #%lu OFF\n", static_cast<unsigned long>(n));
     delay(500);
     ++n;
 }

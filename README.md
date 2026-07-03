@@ -97,6 +97,14 @@ Named colours (`cbhal::colors::Red/Green/Blue/White/Off`) or any `LedColor{r,g,b
 The LED is driven with **FastLED** (a library dependency, auto-installed by
 PlatformIO); under a bare ESP-IDF build the LED calls are no-ops.
 
+> FastLED is pinned to **3.6.0**: it predates FastLED's RMT5 driver rewrite, which
+> targets arduino-esp32 3.x / IDF 5 and produces corrupted WS2812 output on the
+> arduino-esp32 2.0.x (IDF 4.4) core this board uses.
+
+When mixing the LED with `Serial`, flush the UART before an LED write so the
+WS2812 RMT transfer and the console don't corrupt each other (see the `LedBlink`
+example).
+
 ## Building the examples
 
 A `Makefile` wraps the common tasks:

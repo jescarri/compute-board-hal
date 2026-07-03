@@ -19,7 +19,7 @@
   "platforms": ["espressif32"],
   "headers": "ComputeBoardHal.h",
   "dependencies": {
-    "fastled/FastLED": "^3.9.0"
+    "fastled/FastLED": "3.6.0"
   },
   "export": {
     "exclude": [
