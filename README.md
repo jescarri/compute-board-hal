@@ -1,5 +1,14 @@
 # ComputeBoardHal
 
+[![Tests](https://github.com/jescarri/compute-board-hal/actions/workflows/tests.yml/badge.svg)](https://github.com/jescarri/compute-board-hal/actions/workflows/tests.yml)
+[![Build](https://github.com/jescarri/compute-board-hal/actions/workflows/build.yml/badge.svg)](https://github.com/jescarri/compute-board-hal/actions/workflows/build.yml)
+[![Lint](https://github.com/jescarri/compute-board-hal/actions/workflows/lint.yml/badge.svg)](https://github.com/jescarri/compute-board-hal/actions/workflows/lint.yml)
+[![Release](https://github.com/jescarri/compute-board-hal/actions/workflows/release.yml/badge.svg)](https://github.com/jescarri/compute-board-hal/actions/workflows/release.yml)
+[![Latest release](https://img.shields.io/github/v/release/jescarri/compute-board-hal?sort=semver&display_name=tag&label=release)](https://github.com/jescarri/compute-board-hal/releases)
+[![License: MIT](https://img.shields.io/github/license/jescarri/compute-board-hal?label=license)](LICENSE)
+[![Platform: ESP32](https://img.shields.io/badge/platform-ESP32-blue)](https://www.espressif.com/en/products/socs/esp32)
+[![Framework: Arduino | ESP-IDF](https://img.shields.io/badge/framework-Arduino%20%7C%20ESP--IDF-00979D)](platformio.ini)
+
 A mini hardware abstraction layer for the custom **ESP32-WROOM-32E `compute-board`**.
 It wraps the three things every add-on for this board needs to get right:
 
