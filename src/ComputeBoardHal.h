@@ -48,19 +48,28 @@ class ComputeBoardHal {
     bool isConfigAsserted() const;
     void setConfigActiveLow(bool activeLow) { configActiveLow_ = activeLow; }
 
+    // --- On-board LED (LED1 on GPIO15) -------------------------------------
+    // A plain on/off LED (active-high), powered from the VCC_AUX rail. begin()
+    // configures the pin as an output and leaves the LED off.
+    void ledOn();
+    void ledOff();
+    void setLed(bool on);
+    void toggleLed();
+    bool ledIsOn() const { return ledOn_; }
+
     // --- RTC power domains -------------------------------------------------
     // Persistent override for the RTC power-domain configuration used by deep
     // sleep. Defaults to RtcPowerConfig::maxSavings() (all domains OFF).
-    void setRtcPowerConfig(const RtcPowerConfig& cfg) { rtcCfg_ = cfg; }
-    const RtcPowerConfig& rtcPowerConfig() const { return rtcCfg_; }
+    void setRtcPowerConfig(const RtcPowerConfig &cfg) { rtcCfg_ = cfg; }
+    const RtcPowerConfig &rtcPowerConfig() const { return rtcCfg_; }
 
     // --- Deep sleep --------------------------------------------------------
     // Force every registered/bus pin into latched Hi-Z, reset the always-on
     // pins, apply the RTC power config, drive VCC_AUX LOW and hold it, then
     // enter timer-wake deep sleep. Does not return.
-    [[noreturn]] void deepSleepMicros(std::uint64_t us, const RtcPowerConfig& cfg);
+    [[noreturn]] void deepSleepMicros(std::uint64_t us, const RtcPowerConfig &cfg);
     [[noreturn]] void deepSleepMicros(std::uint64_t us) { deepSleepMicros(us, rtcCfg_); }
-    [[noreturn]] void deepSleepSeconds(std::uint64_t s, const RtcPowerConfig& cfg) {
+    [[noreturn]] void deepSleepSeconds(std::uint64_t s, const RtcPowerConfig &cfg) {
         deepSleepMicros(s * 1000000ULL, cfg);
     }
     [[noreturn]] void deepSleepSeconds(std::uint64_t s) { deepSleepMicros(s * 1000000ULL, rtcCfg_); }
@@ -69,12 +78,13 @@ class ComputeBoardHal {
     SleepPlan buildPlan() const { return SleepPlan::build(registered_.data(), registeredCount_); }
 
   private:
-    void applyRtcPowerConfig(const RtcPowerConfig& cfg) const;
+    void applyRtcPowerConfig(const RtcPowerConfig &cfg) const;
 
     std::array<int, kMaxPlanPins> registered_{};
     std::size_t registeredCount_ = 0;
     RtcPowerConfig rtcCfg_       = RtcPowerConfig::maxSavings();
     bool railEnabled_            = false;
+    bool ledOn_                  = false;
     bool configActiveLow_        = true;
 };
 

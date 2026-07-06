@@ -25,6 +25,11 @@ registerPin	KEYWORD2
 registerPins	KEYWORD2
 isConfigAsserted	KEYWORD2
 setConfigActiveLow	KEYWORD2
+ledOn	KEYWORD2
+ledOff	KEYWORD2
+setLed	KEYWORD2
+toggleLed	KEYWORD2
+ledIsOn	KEYWORD2
 setRtcPowerConfig	KEYWORD2
 rtcPowerConfig	KEYWORD2
 deepSleepMicros	KEYWORD2

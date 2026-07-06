@@ -13,6 +13,20 @@
 #include "driver/gpio.h"
 #include "esp_sleep.h"
 
+// LED1 (GPIO15) is a plain on/off LED, driven with the same gpio helpers as the
+// rest of the pins.
+#if defined(ARDUINO)
+#include <Arduino.h>
+#endif
+
+// Opt-in serial tracing. Build with -D CBHAL_DEBUG to have the driver print what
+// it does over Serial (which the application must have begun). No-op otherwise.
+#if defined(ARDUINO) && defined(CBHAL_DEBUG)
+#define CBHAL_LOG(...) Serial.printf("[cbhal] " __VA_ARGS__)
+#else
+#define CBHAL_LOG(...) ((void)0)
+#endif
+
 namespace cbhal {
 
 namespace {
@@ -32,36 +46,82 @@ esp_sleep_pd_option_t toIdfOption(PowerDomainOption option) {
 }
 
 // Drive an output pin to a level after clearing any latched hold on it.
+//
+// Under Arduino we use pinMode/digitalWrite. This is the path proven on this
+// board (and its sibling lora-sensor) for GPIO13/VCC_AUX_ENA, which is an
+// RTC-capable pad: bare gpio_set_direction/gpio_set_level does not reliably take
+// such a pad high, whereas Arduino's pinMode does the extra pad-mux/reset work.
+// Bare ESP-IDF builds fall back to the gpio driver (with gpio_reset_pin to
+// detach any prior routing).
 void driveOutput(int gpio, int level) {
     const gpio_num_t pin = asGpio(gpio);
     gpio_hold_dis(pin);
+#if defined(ARDUINO)
+    pinMode(gpio, OUTPUT);
+    digitalWrite(gpio, level ? HIGH : LOW);
+#else
+    gpio_reset_pin(pin);
     gpio_set_direction(pin, GPIO_MODE_OUTPUT);
     gpio_set_level(pin, level);
+#endif
+}
+
+// Configure a pin as an input with the internal pull-up enabled. Used for the
+// config button so no external pull-up resistor is needed (the board pull-up can
+// be removed to keep GPIO12/MTDI low at reset for a correct 3.3 V flash strap).
+void configureInputPullup(int gpio) {
+#if defined(ARDUINO)
+    pinMode(gpio, INPUT_PULLUP);
+#else
+    gpio_set_direction(asGpio(gpio), GPIO_MODE_INPUT);
+    gpio_set_pull_mode(asGpio(gpio), GPIO_PULLUP_ONLY);
+#endif
+}
+
+// Read a pin's current logic level (0/1).
+int readLevel(int gpio) {
+#if defined(ARDUINO)
+    return digitalRead(gpio);
+#else
+    return gpio_get_level(asGpio(gpio));
+#endif
 }
 
 }        // namespace
 
 void ComputeBoardHal::begin() {
-    // Release holds latched by a previous deep sleep so the rail can move again.
+    // Release holds latched by a previous deep sleep so the pads can move again.
     gpio_deep_sleep_hold_dis();
     gpio_hold_dis(asGpio(kPinVccAuxEna));
+    gpio_hold_dis(asGpio(kPinConfigEna));
 
     // Bring up the secondary rail (active-high; the board also pulls it up).
     driveOutput(kPinVccAuxEna, 1);
+    gpio_hold_dis(asGpio(kPinVccAuxEna));        // ensure the pad is free to move
     railEnabled_ = true;
 
-    // Config button is an input; the board provides the pull-up.
-    gpio_set_direction(asGpio(kPinConfigEna), GPIO_MODE_INPUT);
+    // Config button as input with the internal pull-up (no external resistor
+    // needed). The button pulls it to GND when pressed -> active-low.
+    configureInputPullup(kPinConfigEna);
+
+    // On-board LED off to start.
+    driveOutput(kPinLed, 0);
+    ledOn_ = false;
+
+    CBHAL_LOG("begin: VCC_AUX_ENA(GPIO%d)=%d config(GPIO%d)=%d\n", kPinVccAuxEna,
+              readLevel(kPinVccAuxEna), kPinConfigEna, readLevel(kPinConfigEna));
 }
 
 void ComputeBoardHal::enableAuxRail() {
     driveOutput(kPinVccAuxEna, 1);
     railEnabled_ = true;
+    CBHAL_LOG("enableAuxRail: GPIO%d=%d\n", kPinVccAuxEna, readLevel(kPinVccAuxEna));
 }
 
 void ComputeBoardHal::disableAuxRail() {
     driveOutput(kPinVccAuxEna, 0);
     railEnabled_ = false;
+    CBHAL_LOG("disableAuxRail: GPIO%d=%d\n", kPinVccAuxEna, readLevel(kPinVccAuxEna));
 }
 
 void ComputeBoardHal::registerPin(int gpio) {
@@ -80,8 +140,24 @@ void ComputeBoardHal::registerPins(std::initializer_list<int> gpios) {
 }
 
 bool ComputeBoardHal::isConfigAsserted() const {
-    return decodeConfigLevel(gpio_get_level(asGpio(kPinConfigEna)), configActiveLow_);
+    return decodeConfigLevel(readLevel(kPinConfigEna), configActiveLow_);
 }
+
+void ComputeBoardHal::ledOn() {
+    driveOutput(kPinLed, 1);
+    ledOn_ = true;
+    CBHAL_LOG("led GPIO%d ON\n", kPinLed);
+}
+
+void ComputeBoardHal::ledOff() {
+    driveOutput(kPinLed, 0);
+    ledOn_ = false;
+    CBHAL_LOG("led GPIO%d OFF\n", kPinLed);
+}
+
+void ComputeBoardHal::setLed(bool on) { on ? ledOn() : ledOff(); }
+
+void ComputeBoardHal::toggleLed() { setLed(!ledOn_); }
 
 void ComputeBoardHal::applyRtcPowerConfig(const RtcPowerConfig& cfg) const {
     esp_sleep_pd_config(ESP_PD_DOMAIN_RTC_PERIPH, toIdfOption(cfg.rtc_periph));
@@ -94,6 +170,12 @@ void ComputeBoardHal::deepSleepMicros(std::uint64_t us, const RtcPowerConfig& cf
     const SleepPlan plan    = buildPlan();
     const PinOp* ops        = plan.ops();
     const std::size_t count = plan.opCount();
+
+    CBHAL_LOG("deepSleep: %llu us, %u pin ops, rail->LOW+hold\n", us,
+              static_cast<unsigned>(count));
+#if defined(ARDUINO) && defined(CBHAL_DEBUG)
+    Serial.flush();        // make sure the trace is out before the pads/UART die
+#endif
 
     // 1. Put peripheral I/O into Hi-Z (latched) and reset the always-on pins.
     for (std::size_t i = 0; i < count; ++i) {
@@ -109,16 +191,24 @@ void ComputeBoardHal::deepSleepMicros(std::uint64_t us, const RtcPowerConfig& cf
         }
     }
 
-    // 2. Apply the RTC power-domain configuration (default: all domains OFF).
+    // 2. CONFIG_ENA (GPIO12) is the MTDI flash-voltage strapping pin. Force it LOW
+    //    and latch it so the next deep-sleep wake re-samples the strap as low
+    //    (3.3 V flash) and the debounce cap can't hold a high charge into reset.
+    //    (Deliberately NOT left floating/Hi-Z: on a strapping pin that risks a
+    //    1.8 V-flash mis-strap -- and a boot loop -- on wake.)
+    driveOutput(kPinConfigEna, 0);
+    gpio_hold_en(asGpio(kPinConfigEna));
+
+    // 3. Apply the RTC power-domain configuration (default: all domains OFF).
     applyRtcPowerConfig(cfg);
 
-    // 3. Collapse the secondary rail and latch it LOW for the whole sleep.
+    // 4. Collapse the secondary rail and latch it LOW for the whole sleep.
     driveOutput(kPinVccAuxEna, 0);
     railEnabled_ = false;
     gpio_hold_en(asGpio(kPinVccAuxEna));
     gpio_deep_sleep_hold_en();
 
-    // 4. Arm the timer wake-up and sleep. Does not return.
+    // 5. Arm the timer wake-up and sleep. Does not return.
     esp_sleep_enable_timer_wakeup(us);
     esp_deep_sleep_start();
 }

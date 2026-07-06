@@ -21,7 +21,7 @@ constexpr int kPinVccAuxEna = 13;
 constexpr int kPinConfigEna = 12;
 
 // --- On-board peripherals ---------------------------------------------------
-constexpr int kPinLed = 15;        // WS2812 addressable LED.
+constexpr int kPinLed = 15;        // LED1: on-board on/off LED (active-high).
 
 // I2C
 constexpr int kPinSda = 21;

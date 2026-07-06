@@ -1,5 +1,14 @@
 # ComputeBoardHal
 
+[![Tests](https://github.com/jescarri/compute-board-hal/actions/workflows/tests.yml/badge.svg)](https://github.com/jescarri/compute-board-hal/actions/workflows/tests.yml)
+[![Build](https://github.com/jescarri/compute-board-hal/actions/workflows/build.yml/badge.svg)](https://github.com/jescarri/compute-board-hal/actions/workflows/build.yml)
+[![Lint](https://github.com/jescarri/compute-board-hal/actions/workflows/lint.yml/badge.svg)](https://github.com/jescarri/compute-board-hal/actions/workflows/lint.yml)
+[![Release](https://github.com/jescarri/compute-board-hal/actions/workflows/release.yml/badge.svg)](https://github.com/jescarri/compute-board-hal/actions/workflows/release.yml)
+[![Latest release](https://img.shields.io/github/v/release/jescarri/compute-board-hal?sort=semver&display_name=tag&label=release)](https://github.com/jescarri/compute-board-hal/releases)
+[![License: MIT](https://img.shields.io/github/license/jescarri/compute-board-hal?label=license)](LICENSE)
+[![Platform: ESP32](https://img.shields.io/badge/platform-ESP32-blue)](https://www.espressif.com/en/products/socs/esp32)
+[![Framework: Arduino | ESP-IDF](https://img.shields.io/badge/framework-Arduino%20%7C%20ESP--IDF-00979D)](platformio.ini)
+
 A mini hardware abstraction layer for the custom **ESP32-WROOM-32E `compute-board`**.
 It wraps the three things every add-on for this board needs to get right:
 
@@ -66,6 +75,7 @@ void loop() {}
 | `registerPin(gpio)` / `registerPins({...})` | Add application pins to force Hi-Z at sleep. |
 | `isConfigAsserted()` | Probe `CONFIG_ENA` (GPIO12). Returns `true`/`false` (active-low by default). |
 | `setConfigActiveLow(bool)` | Override config-button polarity. |
+| `ledOn()` / `ledOff()` / `setLed(bool)` / `toggleLed()` | Drive the on-board LED (LED1 / GPIO15), a plain on/off LED. |
 | `setRtcPowerConfig(cfg)` / `rtcPowerConfig()` | Persistent RTC power-domain config (default: all OFF). |
 | `deepSleepSeconds(s[, cfg])` / `deepSleepMicros(us[, cfg])` | Enter deep sleep; does not return. |
 | `buildPlan()` | Inspect the deep-sleep pin plan without sleeping. |
@@ -83,6 +93,54 @@ board.setRtcPowerConfig(cbhal::RtcPowerConfig::keepRtcMemory());
 
 `RtcPowerConfig` is a plain aggregate; you can also set each domain
 (`rtc_periph`, `rtc_slow_mem`, `rtc_fast_mem`, `xtal`) to `Off` / `On` / `Auto`.
+
+### On-board LED
+
+`LED1` (GPIO15) is a plain on/off LED on the `VCC_AUX` rail (active-high). No
+external library is required.
+
+```cpp
+board.ledOn();
+board.ledOff();
+board.setLed(true);      // == ledOn()
+board.toggleLed();
+```
+
+The `LedBlink` example blinks it and also demonstrates the config-button probe
+(prints `CONF_PRESSED`, waits 10 s, and reboots when the button is pressed).
+
+## Building the examples
+
+A `Makefile` wraps the common tasks:
+
+```bash
+make test                                   # host unit tests
+make build  EXAMPLE=LedBlink                # compile an example for the board
+make upload EXAMPLE=LedBlink PORT=/dev/ttyUSB0   # compile + flash to a board
+make build-all                              # compile every example
+```
+
+## Debugging
+
+Build with `-D CBHAL_DEBUG` to have the HAL trace what it does over `Serial`
+(the sketch must call `Serial.begin()`):
+
+```ini
+build_flags = -D CBHAL_DEBUG
+```
+
+It prints the `VCC_AUX_ENA`/`CONFIG_ENA` pin levels in `begin()`, every rail and
+LED change, and the deep-sleep entry. The `LedBlink` example also prints the
+boot/reset reason and the rail pin level each cycle without the flag.
+
+> **Boot caveat — GPIO12 (`CONFIG_ENA` / MTDI).** GPIO12 is the ESP32 flash-voltage
+> strapping pin and must be **low at reset**. An external pull-up on the config
+> button forces it high → selects 1.8 V flash → intermittent boot failures
+> (`invalid header: 0xffffffff`, `RTCWDT_RTC_RESET`) and a "sometimes" LED.
+> **Recommended: remove the external pull-up.** GPIO12 has an internal pull-down at
+> reset (correct 3.3 V strap), and the HAL supplies the pull-up at runtime
+> (`INPUT_PULLUP`) for the button; deep sleep drives GPIO12 low + holds it so the
+> wake reset also straps correctly. A cap from GPIO12 to GND is fine.
 
 ## Design & testing
 

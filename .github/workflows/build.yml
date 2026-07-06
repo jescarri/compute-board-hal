@@ -1,0 +1,46 @@
+name: Build
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+env:
+  PLATFORMIO_CACHE_DIR: ~/.platformio/.cache
+
+jobs:
+  compile-check:
+    name: Compile-check examples (ESP32 / Arduino)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Cache PlatformIO
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/pip
+            ${{ env.PLATFORMIO_CACHE_DIR }}
+          key: ${{ runner.os }}-pio-${{ hashFiles('platformio.ini') }}
+          restore-keys: ${{ runner.os }}-pio-
+
+      - name: Install PlatformIO
+        run: pip install --upgrade platformio
+
+      - name: Compile-check examples for ESP32 (Arduino)
+        run: |
+          for ex in examples/*/*.ino; do
+            echo "::group::Building $ex"
+            pio ci --lib="." --board=esp32dev \
+              --project-option="framework=arduino" \
+              --project-option="build_flags=-std=gnu++14 -Wall -Wextra" \
+              "$ex"
+            echo "::endgroup::"
+          done
