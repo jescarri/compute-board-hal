@@ -21,7 +21,8 @@ EXAMPLE_DIR := examples/$(EXAMPLE)
 UPLOAD_PORT := $(if $(PORT),--upload-port $(PORT),)
 SRC_FILES   := $(shell find src examples test -type f \( -name '*.cpp' -o -name '*.h' -o -name '*.ino' \))
 
-.PHONY: all help test build upload clean build-all format check
+.PHONY: all help test build upload clean build-all format check \
+	sdcard-example upload-sdcard-example
 
 all: build  ## Default: build the selected example
 
@@ -37,6 +38,12 @@ build:  ## Compile EXAMPLE for the board
 
 upload:  ## Compile + flash EXAMPLE to the board (set PORT=/dev/tty...)
 	PLATFORMIO_SRC_DIR=$(EXAMPLE_DIR) $(PIO) run -e example -t upload $(UPLOAD_PORT)
+
+sdcard-example:  ## Compile the SdCardList example for the board
+	$(MAKE) build EXAMPLE=SdCardList
+
+upload-sdcard-example:  ## Compile + flash the SdCardList example (set PORT=/dev/tty...)
+	$(MAKE) upload EXAMPLE=SdCardList
 
 clean:  ## Remove PlatformIO build output
 	PLATFORMIO_SRC_DIR=$(EXAMPLE_DIR) $(PIO) run -e example -t clean || true
