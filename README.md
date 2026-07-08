@@ -123,6 +123,11 @@ Registration rules and caveats:
 > disabled), with `rtc_gpio_isolate()` applied to RTC-capable pads. Per-pin
 > **opt-in pull-up** is planned but not yet implemented.
 
+For the full story on RTC-pad isolation — how it works, when to use it and when
+not to, and the mandatory wake-up hold release — see
+[docs/DEEP_SLEEP.md](docs/DEEP_SLEEP.md). Isolating the RTC pads measured
+**31.1 µA → 20.7 µA** of deep-sleep current on this board.
+
 ### RTC power domains
 
 Deep sleep powers down all RTC domains by default (lowest current). To keep RTC

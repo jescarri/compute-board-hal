@@ -48,7 +48,7 @@ input-only for safety in `isInputOnly()`.
 |---|---|---|
 | VCC_AUX bus pins | `kDefaultAuxHiZPins` = {21, 22, 5, 18, 19, 23} | `INPUT` + float + disable pulls + `gpio_hold_en` |
 | Application pins | (registered at runtime) | same Hi-Z + hold |
-| RTC-capable Hi-Z pins | any Hi-Z pin where `isRtcGpio()` | `rtc_gpio_isolate()` (disconnect in/out/pulls + hold); released by `rtc_gpio_hold_dis()` at `begin()` |
+| RTC-capable Hi-Z pins | any Hi-Z pin where `isRtcGpio()` | `rtc_gpio_isolate()` (disconnect in/out/pulls + hold); released by `rtc_gpio_hold_dis()` at `begin()` — see [DEEP_SLEEP.md](DEEP_SLEEP.md) |
 | Strapping / always-on | `kAlwaysOnResetPins` = {0, 2, 34, 35, 36, 37, 38, 39} | `gpio_reset_pin` |
 | Boot strap | `kPinBoot` = 0 | `gpio_reset_pin` only — **never Hi-Z/isolated** (no board pull-up; needs internal pull-up to strap flash boot) |
 | Config (strapping) | `kPinConfigEna` = 12 | driven **LOW** + `gpio_hold_en` (MTDI strap must be low at wake) |
