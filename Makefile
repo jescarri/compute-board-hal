@@ -22,7 +22,8 @@ UPLOAD_PORT := $(if $(PORT),--upload-port $(PORT),)
 SRC_FILES   := $(shell find src examples test -type f \( -name '*.cpp' -o -name '*.h' -o -name '*.ino' \))
 
 .PHONY: all help test build upload clean build-all format check \
-	sdcard-example upload-sdcard-example
+	sdcard-example upload-sdcard-example \
+	deep-sleep-example upload-deep-sleep-example check-wifi-env
 
 all: build  ## Default: build the selected example
 
@@ -44,6 +45,23 @@ sdcard-example:  ## Compile the SdCardList example for the board
 
 upload-sdcard-example:  ## Compile + flash the SdCardList example (set PORT=/dev/tty...)
 	$(MAKE) upload EXAMPLE=SdCardList
+
+# --- DeepSleepCycle example -------------------------------------------------
+# Wi-Fi credentials are baked in at compile time from the WIFI_SSID / WIFI_PASS
+# environment (or make) variables and passed to the compiler as string -D flags.
+# The build aborts (here and via #error in the sketch) if either is unset.
+DEEP_SLEEP_ENV = PLATFORMIO_SRC_DIR=examples/DeepSleepCycle \
+	PLATFORMIO_BUILD_FLAGS="-DWIFI_SSID='\"$(WIFI_SSID)\"' -DWIFI_PASS='\"$(WIFI_PASS)\"'"
+
+check-wifi-env:
+	@[ -n "$(WIFI_SSID)" ] || { echo "ERROR: WIFI_SSID is not set (e.g. make deep-sleep-example WIFI_SSID=<ssid> WIFI_PASS=<password>)"; exit 1; }
+	@[ -n "$(WIFI_PASS)" ] || { echo "ERROR: WIFI_PASS is not set (e.g. make deep-sleep-example WIFI_SSID=<ssid> WIFI_PASS=<password>)"; exit 1; }
+
+deep-sleep-example: check-wifi-env  ## Compile the DeepSleepCycle example (needs WIFI_SSID/WIFI_PASS)
+	$(DEEP_SLEEP_ENV) $(PIO) run -e example
+
+upload-deep-sleep-example: check-wifi-env  ## Compile + flash the DeepSleepCycle example (needs WIFI_SSID/WIFI_PASS; set PORT=/dev/tty...)
+	$(DEEP_SLEEP_ENV) $(PIO) run -e example -t upload $(UPLOAD_PORT)
 
 clean:  ## Remove PlatformIO build output
 	PLATFORMIO_SRC_DIR=$(EXAMPLE_DIR) $(PIO) run -e example -t clean || true

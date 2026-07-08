@@ -199,16 +199,25 @@ void ComputeBoardHal::deepSleepMicros(std::uint64_t us, const RtcPowerConfig& cf
     driveOutput(kPinConfigEna, 0);
     gpio_hold_en(asGpio(kPinConfigEna));
 
-    // 3. Apply the RTC power-domain configuration (default: all domains OFF).
+    // 3. LED1 (GPIO15) is the active-high LED drive pin. Drive it LOW and latch
+    //    it so no current bleeds into the LED during sleep. A plain gpio_reset_pin
+    //    here would instead ENABLE the internal pull-up and faintly light the LED.
+    //    GPIO15 is the MTDO strapping pin, but LOW only suppresses the ROM boot
+    //    log on wake -- it does not affect flash voltage or boot mode.
+    driveOutput(kPinLed, 0);
+    ledOn_ = false;
+    gpio_hold_en(asGpio(kPinLed));
+
+    // 4. Apply the RTC power-domain configuration (default: all domains OFF).
     applyRtcPowerConfig(cfg);
 
-    // 4. Collapse the secondary rail and latch it LOW for the whole sleep.
+    // 5. Collapse the secondary rail and latch it LOW for the whole sleep.
     driveOutput(kPinVccAuxEna, 0);
     railEnabled_ = false;
     gpio_hold_en(asGpio(kPinVccAuxEna));
     gpio_deep_sleep_hold_en();
 
-    // 5. Arm the timer wake-up and sleep. Does not return.
+    // 6. Arm the timer wake-up and sleep. Does not return.
     esp_sleep_enable_timer_wakeup(us);
     esp_deep_sleep_start();
 }

@@ -77,13 +77,14 @@ struct PinOp {
 constexpr std::size_t kMaxPlanPins = 40;
 
 // An ordered, deduplicated set of pin operations to apply before deep sleep.
-// The rail-enable pin is never part of the ops: it is handled last by the
-// driver (driven LOW + held), and is exposed here via railPin().
+// The rail-enable, config and LED pins are never part of the ops: each is
+// handled by the driver with a dedicated "drive LOW + hold" step, and the rail
+// and LED pins are exposed here via railPin() / ledPin().
 class SleepPlan {
   public:
     // Build from the board defaults plus caller-registered application pins.
-    // `registered` may be null when `count` is 0. Invalid pins, the rail pin
-    // and the config pin are silently skipped.
+    // `registered` may be null when `count` is 0. Invalid pins, the rail pin,
+    // the config pin and the LED pin are silently skipped.
     static SleepPlan build(const int* registered, std::size_t count);
 
     const PinOp* ops() const { return ops_.data(); }
@@ -91,6 +92,10 @@ class SleepPlan {
 
     // Rail-enable pin: always the final "drive LOW + hold" step at sleep.
     int railPin() const { return kPinVccAuxEna; }
+
+    // LED1 drive pin (active-high): driven LOW + held at sleep so the internal
+    // pull-up can't bleed current into the LED. Never appears in ops().
+    int ledPin() const { return kPinLed; }
 
     bool contains(int gpio, PinAction action) const;
     bool hasHiZ(int gpio) const { return contains(gpio, PinAction::HiZHold); }

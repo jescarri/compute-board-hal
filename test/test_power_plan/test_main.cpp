@@ -50,6 +50,18 @@ void test_plan_excludes_rail_and_config(void) {
     TEST_ASSERT_EQUAL_INT(kPinVccAuxEna, plan.railPin());
 }
 
+void test_plan_excludes_led(void) {
+    // The LED pin (GPIO15) has dedicated drive-LOW + hold handling in the driver
+    // and must never appear in the plan -- not as Reset, and not as Hi-Z even if
+    // the application tries to register it (Hi-Z would let the internal pull-up
+    // bleed current into the active-high LED during sleep).
+    const int regs[] = {kPinLed};
+    SleepPlan plan   = SleepPlan::build(regs, 1);
+    TEST_ASSERT_FALSE(plan.hasReset(kPinLed));
+    TEST_ASSERT_FALSE(plan.hasHiZ(kPinLed));
+    TEST_ASSERT_EQUAL_INT(kPinLed, plan.ledPin());
+}
+
 void test_plan_registers_user_pin_once(void) {
     const int regs[] = {25, 25, 26};        // duplicate 25
     SleepPlan plan   = SleepPlan::build(regs, 3);
@@ -115,6 +127,7 @@ int main(int, char**) {
     RUN_TEST(test_plan_includes_default_bus_pins_as_hiz);
     RUN_TEST(test_plan_includes_always_on_pins_as_reset);
     RUN_TEST(test_plan_excludes_rail_and_config);
+    RUN_TEST(test_plan_excludes_led);
     RUN_TEST(test_plan_registers_user_pin_once);
     RUN_TEST(test_plan_skips_invalid_pins);
     RUN_TEST(test_plan_hiz_wins_over_reset_on_overlap);

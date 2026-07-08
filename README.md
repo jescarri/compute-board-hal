@@ -80,6 +80,46 @@ void loop() {}
 | `deepSleepSeconds(s[, cfg])` / `deepSleepMicros(us[, cfg])` | Enter deep sleep; does not return. |
 | `buildPlan()` | Inspect the deep-sleep pin plan without sleeping. |
 
+### Choosing which pins go Hi-Z at deep sleep
+
+At deep sleep the HAL puts pins into a low-power state in three tiers:
+
+1. **Always, automatically** — the on-board bus pins on the `VCC_AUX` rail
+   (`kDefaultAuxHiZPins` = I²C `21/22` + SD `5/18/19/23`) are latched **Hi-Z**
+   (input + pulls disabled + `gpio_hold_en`), and the rail (`13`), config (`12`)
+   and LED (`15`) pins are driven **LOW and held**. You don't manage these.
+2. **Per application, opt-in** — anything *else* your program drives is your
+   responsibility. Call `registerPin(gpio)` / `registerPins({...})` (any time
+   before `deepSleepSeconds()`) to add those GPIOs to the latched-Hi-Z set. This
+   is the knob for "put my pins, and every otherwise-unused header pin, into a
+   defined floating state so nothing leaks during sleep."
+3. **Strapping / input-only** — `{0, 2, 34–39}` get `gpio_reset_pin()`.
+
+```cpp
+board.registerPins({4, 14, 16, 17, 25, 26, 27, 32, 33});   // force these Hi-Z at sleep
+// ...
+board.deepSleepSeconds(600);
+```
+
+Registration rules and caveats:
+
+- **Order/dedup don't matter** — pins are de-duplicated, and a registered pin
+  overrides its default action (registering a strapping pin **promotes it to
+  Hi-Z**, dropping the `gpio_reset_pin` pull-up).
+- **Ignored automatically:** invalid GPIOs, and the rail/config/LED pins (they
+  have dedicated handling and can't be re-purposed).
+- **Do NOT register GPIO0.** On this board GPIO0 has no external pull-up and
+  relies on its internal pull-up to strap boot-from-flash on wake; floating it
+  risks dropping into download mode. Leave it to the HAL.
+- **Input-only pins (34–39)** have no output driver or pulls, so registering
+  them for Hi-Z does nothing useful — the HAL resets them instead; they can't leak.
+- **`buildPlan()`** lets you inspect the resulting plan (which pins are Hi-Z vs
+  reset) in a unit test without sleeping.
+
+> **Note — pull-ups & `rtc_gpio_isolate()`.** Today registration only produces
+> *floating* Hi-Z (pulls disabled). Per-pin **opt-in pull-up** and belt-and-suspenders
+> `rtc_gpio_isolate()` on RTC pads are planned but not yet implemented.
+
 ### RTC power domains
 
 Deep sleep powers down all RTC domains by default (lowest current). To keep RTC
@@ -96,8 +136,15 @@ board.setRtcPowerConfig(cbhal::RtcPowerConfig::keepRtcMemory());
 
 ### On-board LED
 
-`LED1` (GPIO15) is a plain on/off LED on the `VCC_AUX` rail (active-high). No
-external library is required.
+`LED1` (GPIO15) is a plain on/off LED (active-high), wired
+`GPIO15 → LED → 1 kΩ → GND` — driven directly by the GPIO pad, so it works
+regardless of the `VCC_AUX` rail state. No external library is required.
+
+> **Deep sleep & GPIO15 (MTDO).** GPIO15 must **not** be `gpio_reset_pin`'d at
+> sleep: that enables the internal pull-up, which bleeds ~30 µA into the
+> active-high LED and faintly lights it. The HAL instead drives GPIO15 **LOW and
+> latches it** (like the config pin). GPIO15-low is a safe strap — it only
+> suppresses the ROM boot log at wake, not flash voltage or boot mode.
 
 ```cpp
 board.ledOn();
@@ -118,6 +165,19 @@ make test                                   # host unit tests
 make build  EXAMPLE=LedBlink                # compile an example for the board
 make upload EXAMPLE=LedBlink PORT=/dev/ttyUSB0   # compile + flash to a board
 make build-all                              # compile every example
+```
+
+### DeepSleepCycle (Wi-Fi power test)
+
+`DeepSleepCycle` joins Wi-Fi, does one HTTPS GET against
+`https://dummy-json.mock.beeceptor.com/posts`, then deep-sleeps for 10 minutes —
+a realistic duty cycle for measuring the board's sleep current. The Wi-Fi
+credentials are baked in **at compile time** from the `WIFI_SSID` / `WIFI_PASS`
+variables (never checked into source); the build aborts if either is unset:
+
+```bash
+make deep-sleep-example        WIFI_SSID=MyNet WIFI_PASS=secret
+make upload-deep-sleep-example WIFI_SSID=MyNet WIFI_PASS=secret PORT=/dev/ttyUSB0
 ```
 
 ## Debugging

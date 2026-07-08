@@ -13,8 +13,10 @@ bool SleepPlan::present(int gpio) const {
 
 void SleepPlan::addUnique(int gpio, PinAction action) {
     if (!isValidGpio(gpio)) return;
-    // The rail and config pins have dedicated handling and never appear in ops.
-    if (gpio == kPinVccAuxEna || gpio == kPinConfigEna) return;
+    // The rail, config and LED pins have dedicated drive-LOW + hold handling in
+    // the driver and never appear in ops (Hi-Z on the LED would let the internal
+    // pull-up bleed current into the active-high LED during sleep).
+    if (gpio == kPinVccAuxEna || gpio == kPinConfigEna || gpio == kPinLed) return;
     if (present(gpio)) return;        // first action registered for a pin wins
     if (opCount_ >= ops_.size()) return;
     ops_[opCount_++] = PinOp{gpio, action};

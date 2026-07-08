@@ -63,12 +63,14 @@ constexpr std::array<int, 6> kDefaultAuxHiZPins = {
 };
 
 // Strapping / always-on pins that get gpio_reset_pin() at sleep rather than a
-// latched Hi-Z. Deliberately excludes the rail (13) and config (12) pins, which
-// have dedicated handling.
-constexpr std::array<int, 9> kAlwaysOnResetPins = {
+// latched Hi-Z. Deliberately excludes the rail (13), config (12) and LED (15)
+// pins, which all have dedicated drive-LOW + hold handling. In particular the
+// LED pin must NOT be reset here: gpio_reset_pin() enables the internal pull-up,
+// which would source ~30 uA into the active-high LED and faintly light it during
+// deep sleep.
+constexpr std::array<int, 8> kAlwaysOnResetPins = {
     0,
     2,
-    kPinLed,
     34,
     35,
     36,
