@@ -20,6 +20,14 @@ constexpr int kPinVccAuxEna = 13;
 // Note: also the MTDI flash-voltage strapping pin.
 constexpr int kPinConfigEna = 12;
 
+// Boot / download strapping pin (GPIO0, "ESP_PROG"). On this board it has NO
+// external pull-up (only the boot button to GND), so it relies on the ESP32's
+// internal pull-up to strap boot-from-flash on every reset -- including the
+// deep-sleep wake reset. It must therefore never be forced Hi-Z or isolated at
+// sleep (that would let it float low -> download mode); it is gpio_reset_pin'd
+// (keeps the pull-up) and left un-held.
+constexpr int kPinBoot = 0;
+
 // --- On-board peripherals ---------------------------------------------------
 constexpr int kPinLed = 15;        // LED1: on-board on/off LED (active-high).
 
@@ -51,6 +59,20 @@ constexpr bool isInputOnly(int gpio) {
     return gpio >= 34 && gpio <= 39;
 }
 
+// True for the RTC-capable (RTC_GPIO) pads on the ESP32. These retain their pull
+// / hold configuration into deep sleep, so at sleep they are fully disconnected
+// with rtc_gpio_isolate() (belt-and-suspenders against internal-pull leakage)
+// and released with rtc_gpio_hold_dis() on wake. The full set is
+// {0,2,4,12,13,14,15,25,26,27,32,33,34,35,36,37,38,39}.
+constexpr bool isRtcGpio(int gpio) {
+    // Single return-statement so the function stays a valid C++11 constexpr
+    // (the examples compile under -std=gnu++11 in CI).
+    return gpio == 0 || gpio == 2 || gpio == 4 ||
+           (gpio >= 12 && gpio <= 15) ||        // 12, 13, 14, 15
+           (gpio >= 25 && gpio <= 27) ||        // 25, 26, 27
+           (gpio >= 32 && gpio <= 39);          // 32..39
+}
+
 // Bus pins that live on the VCC_AUX rail and should be forced into Hi-Z at
 // deep sleep by default, on top of any pins the application registers.
 constexpr std::array<int, 6> kDefaultAuxHiZPins = {
@@ -63,12 +85,14 @@ constexpr std::array<int, 6> kDefaultAuxHiZPins = {
 };
 
 // Strapping / always-on pins that get gpio_reset_pin() at sleep rather than a
-// latched Hi-Z. Deliberately excludes the rail (13) and config (12) pins, which
-// have dedicated handling.
-constexpr std::array<int, 9> kAlwaysOnResetPins = {
+// latched Hi-Z. Deliberately excludes the rail (13), config (12) and LED (15)
+// pins, which all have dedicated drive-LOW + hold handling. In particular the
+// LED pin must NOT be reset here: gpio_reset_pin() enables the internal pull-up,
+// which would source ~30 uA into the active-high LED and faintly light it during
+// deep sleep.
+constexpr std::array<int, 8> kAlwaysOnResetPins = {
     0,
     2,
-    kPinLed,
     34,
     35,
     36,

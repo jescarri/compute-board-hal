@@ -48,8 +48,11 @@ input-only for safety in `isInputOnly()`.
 |---|---|---|
 | VCC_AUX bus pins | `kDefaultAuxHiZPins` = {21, 22, 5, 18, 19, 23} | `INPUT` + float + disable pulls + `gpio_hold_en` |
 | Application pins | (registered at runtime) | same Hi-Z + hold |
-| Strapping / always-on | `kAlwaysOnResetPins` = {0, 2, 15, 34, 35, 36, 37, 38, 39} | `gpio_reset_pin` |
+| RTC-capable Hi-Z pins | any Hi-Z pin where `isRtcGpio()` | `rtc_gpio_isolate()` (disconnect in/out/pulls + hold); released by `rtc_gpio_hold_dis()` at `begin()` — see [DEEP_SLEEP.md](DEEP_SLEEP.md) |
+| Strapping / always-on | `kAlwaysOnResetPins` = {0, 2, 34, 35, 36, 37, 38, 39} | `gpio_reset_pin` |
+| Boot strap | `kPinBoot` = 0 | `gpio_reset_pin` only — **never Hi-Z/isolated** (no board pull-up; needs internal pull-up to strap flash boot) |
 | Config (strapping) | `kPinConfigEna` = 12 | driven **LOW** + `gpio_hold_en` (MTDI strap must be low at wake) |
+| LED1 (strapping) | `kPinLed` = 15 | driven **LOW** + `gpio_hold_en` (active-high LED — see caveat) |
 | Rail enable | `kPinVccAuxEna` = 13 | driven **LOW**, `gpio_hold_en`, `gpio_deep_sleep_hold_en` |
 
 If a pin appears in both the registered/Hi-Z set and the reset set, **Hi-Z wins**
@@ -76,7 +79,17 @@ If a pin appears in both the registered/Hi-Z set and the reset set, **Hi-Z wins*
 - **GPIO0 (`ESP_PROG`)** is the boot/download strapping pin and is reset at sleep.
 - Input-only pins (34–39) cannot be driven or held with output levels; they are
   reset rather than Hi-Z-held.
-- **LED1 (GPIO15) is driven as a plain on/off LED** (active-high), powered from the
-  `VCC_AUX` rail. The footprint can accept an addressable WS2812-class part, but that
-  chip's rated VDD is ≥ 3.5 V and this rail is 3.3 V, so it decodes data unreliably;
-  the HAL therefore treats LED1 as a simple digital LED (`ledOn()`/`ledOff()`).
+- **LED1 (GPIO15) is a plain on/off LED** (active-high). It is wired
+  `GPIO15 → LED → 1 kΩ → GND`, i.e. the anode is driven **directly by the GPIO
+  pad** (not from the `VCC_AUX` rail), so `ledOn()`/`ledOff()` work regardless of
+  the rail state. The board originally carried an addressable WS2812-class part,
+  but that chip's rated VDD is ≥ 3.5 V while this supply is 3.3 V, so it decoded
+  data unreliably and was replaced with a basic LED.
+- **GPIO15 is the MTDO strapping pin, and it must NOT be `gpio_reset_pin`'d at
+  sleep.** `gpio_reset_pin()` **enables the internal pull-up** (~45 kΩ), which
+  sources ~30 µA through the active-high LED and **faintly lights it during deep
+  sleep**. The HAL therefore drives GPIO15 **LOW and latches it** (`gpio_hold_en`),
+  exactly like the config pin, so the anode sits at 0 V and no current bleeds.
+  Unlike GPIO12, GPIO15-low is a safe strap: it only **suppresses the ROM boot
+  log** on U0TXD at the next wake (it does not affect flash voltage or boot mode),
+  and the application's own `Serial` output after `Serial.begin()` is unaffected.

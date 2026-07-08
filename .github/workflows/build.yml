@@ -38,9 +38,16 @@ jobs:
         run: |
           for ex in examples/*/*.ino; do
             echo "::group::Building $ex"
+            # DeepSleepCycle takes its Wi-Fi credentials at compile time and
+            # #errors without them; supply placeholders for the compile-check
+            # (nothing is flashed).
+            creds=""
+            case "$ex" in
+              *DeepSleepCycle*) creds="-DWIFI_SSID='\"ci\"' -DWIFI_PASS='\"ci\"'" ;;
+            esac
             pio ci --lib="." --board=esp32dev \
               --project-option="framework=arduino" \
-              --project-option="build_flags=-std=gnu++14 -Wall -Wextra" \
+              --project-option="build_flags=-std=gnu++14 -Wall -Wextra $creds" \
               "$ex"
             echo "::endgroup::"
           done
