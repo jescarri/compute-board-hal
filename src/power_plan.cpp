@@ -30,9 +30,12 @@ SleepPlan SleepPlan::build(const int* registered, std::size_t count) {
         plan.addUnique(gpio, PinAction::HiZHold);
     }
 
-    // 2. Application-registered peripheral pins -> Hi-Z + hold.
+    // 2. Application-registered peripheral pins -> Hi-Z + hold. GPIO0 is never
+    //    promoted to Hi-Z even if registered: it must keep its pull-up for the
+    //    boot strap (see kPinBoot), so it stays in the reset set below.
     if (registered != nullptr) {
         for (std::size_t i = 0; i < count; ++i) {
+            if (registered[i] == kPinBoot) continue;
             plan.addUnique(registered[i], PinAction::HiZHold);
         }
     }

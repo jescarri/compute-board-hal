@@ -62,6 +62,15 @@ void test_plan_excludes_led(void) {
     TEST_ASSERT_EQUAL_INT(kPinLed, plan.ledPin());
 }
 
+void test_plan_never_hiz_boot_pin(void) {
+    // GPIO0 must keep its pull-up for the boot strap, so registering it must NOT
+    // promote it to Hi-Z; it stays a reset pin (never isolated by the driver).
+    const int regs[] = {kPinBoot};
+    SleepPlan plan   = SleepPlan::build(regs, 1);
+    TEST_ASSERT_FALSE(plan.hasHiZ(kPinBoot));
+    TEST_ASSERT_TRUE(plan.hasReset(kPinBoot));
+}
+
 void test_plan_registers_user_pin_once(void) {
     const int regs[] = {25, 25, 26};        // duplicate 25
     SleepPlan plan   = SleepPlan::build(regs, 3);
@@ -128,6 +137,7 @@ int main(int, char**) {
     RUN_TEST(test_plan_includes_always_on_pins_as_reset);
     RUN_TEST(test_plan_excludes_rail_and_config);
     RUN_TEST(test_plan_excludes_led);
+    RUN_TEST(test_plan_never_hiz_boot_pin);
     RUN_TEST(test_plan_registers_user_pin_once);
     RUN_TEST(test_plan_skips_invalid_pins);
     RUN_TEST(test_plan_hiz_wins_over_reset_on_overlap);

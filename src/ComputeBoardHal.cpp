@@ -11,6 +11,7 @@
 #if defined(ESP_PLATFORM)
 
 #include "driver/gpio.h"
+#include "driver/rtc_io.h"
 #include "esp_sleep.h"
 
 // LED1 (GPIO15) is a plain on/off LED, driven with the same gpio helpers as the
@@ -94,6 +95,13 @@ void ComputeBoardHal::begin() {
     gpio_deep_sleep_hold_dis();
     gpio_hold_dis(asGpio(kPinVccAuxEna));
     gpio_hold_dis(asGpio(kPinConfigEna));
+
+    // Release the RTC-IO holds that rtc_gpio_isolate() latched on RTC-capable
+    // pins at the last deep sleep, so isolated pads (SD/I2C/sensor pins) can be
+    // re-initialised on this boot. Harmless on pins that weren't held.
+    for (int g = kGpioMin; g <= kGpioMax; ++g) {
+        if (isRtcGpio(g)) rtc_gpio_hold_dis(asGpio(g));
+    }
 
     // Bring up the secondary rail (active-high; the board also pulls it up).
     driveOutput(kPinVccAuxEna, 1);
@@ -181,11 +189,19 @@ void ComputeBoardHal::deepSleepMicros(std::uint64_t us, const RtcPowerConfig& cf
     for (std::size_t i = 0; i < count; ++i) {
         const gpio_num_t pin = asGpio(ops[i].gpio);
         if (ops[i].action == PinAction::HiZHold) {
-            gpio_set_direction(pin, GPIO_MODE_INPUT);
-            gpio_set_pull_mode(pin, GPIO_FLOATING);
-            gpio_pullup_dis(pin);
-            gpio_pulldown_dis(pin);
-            gpio_hold_en(pin);        // latch high-Z through sleep
+            if (isRtcGpio(ops[i].gpio)) {
+                // RTC-capable pad: fully disconnect internal circuits (input,
+                // output, pull-up/down) and latch it. Belt-and-suspenders against
+                // an internal pull leaking current in deep sleep -- these pads
+                // retain their pull config through sleep otherwise.
+                rtc_gpio_isolate(pin);
+            } else {
+                gpio_set_direction(pin, GPIO_MODE_INPUT);
+                gpio_set_pull_mode(pin, GPIO_FLOATING);
+                gpio_pullup_dis(pin);
+                gpio_pulldown_dis(pin);
+                gpio_hold_en(pin);        // latch high-Z through sleep
+            }
         } else {
             gpio_reset_pin(pin);
         }

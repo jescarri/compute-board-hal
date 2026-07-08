@@ -59,6 +59,20 @@ void test_input_only_pins_are_not_driven(void) {
     TEST_ASSERT_FALSE(isInputOnly(kPinVccAuxEna));
 }
 
+void test_rtc_gpio_membership(void) {
+    // A representative slice of the ESP32 RTC-capable set.
+    for (int p : {0, 2, 4, 12, 13, 14, 15, 25, 26, 27, 32, 33, 34, 39}) {
+        TEST_ASSERT_TRUE(isRtcGpio(p));
+    }
+    // Non-RTC digital pins (incl. the I2C/SPI bus pins) must be excluded so the
+    // driver keeps using the digital Hi-Z + hold path for them.
+    for (int p : {1, 3, 5, 16, 17, 18, 19, 21, 22, 23}) {
+        TEST_ASSERT_FALSE(isRtcGpio(p));
+    }
+    // The boot pin is RTC-capable but is handled via reset, never isolated.
+    TEST_ASSERT_TRUE(isRtcGpio(kPinBoot));
+}
+
 int main(int, char**) {
     UNITY_BEGIN();
     RUN_TEST(test_control_pins_match_schematic);
@@ -66,5 +80,6 @@ int main(int, char**) {
     RUN_TEST(test_no_pin_in_both_sets);
     RUN_TEST(test_all_pins_are_valid_gpios);
     RUN_TEST(test_input_only_pins_are_not_driven);
+    RUN_TEST(test_rtc_gpio_membership);
     return UNITY_END();
 }

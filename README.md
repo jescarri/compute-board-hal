@@ -88,6 +88,9 @@ At deep sleep the HAL puts pins into a low-power state in three tiers:
    (`kDefaultAuxHiZPins` = I²C `21/22` + SD `5/18/19/23`) are latched **Hi-Z**
    (input + pulls disabled + `gpio_hold_en`), and the rail (`13`), config (`12`)
    and LED (`15`) pins are driven **LOW and held**. You don't manage these.
+   **RTC-capable pads** among the Hi-Z pins are additionally disconnected with
+   `rtc_gpio_isolate()` (they retain pull config through sleep otherwise) and
+   released with `rtc_gpio_hold_dis()` on the next `begin()`.
 2. **Per application, opt-in** — anything *else* your program drives is your
    responsibility. Call `registerPin(gpio)` / `registerPins({...})` (any time
    before `deepSleepSeconds()`) to add those GPIOs to the latched-Hi-Z set. This
@@ -116,9 +119,9 @@ Registration rules and caveats:
 - **`buildPlan()`** lets you inspect the resulting plan (which pins are Hi-Z vs
   reset) in a unit test without sleeping.
 
-> **Note — pull-ups & `rtc_gpio_isolate()`.** Today registration only produces
-> *floating* Hi-Z (pulls disabled). Per-pin **opt-in pull-up** and belt-and-suspenders
-> `rtc_gpio_isolate()` on RTC pads are planned but not yet implemented.
+> **Note — pull-ups.** Registration currently produces *floating* Hi-Z (pulls
+> disabled), with `rtc_gpio_isolate()` applied to RTC-capable pads. Per-pin
+> **opt-in pull-up** is planned but not yet implemented.
 
 ### RTC power domains
 
